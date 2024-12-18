@@ -213,7 +213,7 @@
                             <n-grid-item :span="8">
                                 <n-tooltip trigger="hover">
                                     <template #trigger>
-                                        <div class="text-xs text-gray-500 mb-1 cursor-help">球速 (3 ~ 80 m/s)</div>
+                                        <div class="text-xs text-gray-500 mb-1 cursor-help">���速 (3 ~ 80 m/s)</div>
                                     </template>
                                     <span>每秒移动的距离</span>
                                 </n-tooltip>
@@ -396,7 +396,7 @@ const COURT_LIMITS = {
 
 // 默认配置
 const DEFAULT_TRAJECTORY_CONFIG = {
-    arcHeight: 0.15,  // 默认抛物线弧系数（保持2位小数）
+    arcHeight: 0.15,  // 默认抛物��弧系数（保持2位小数）
     speed: 3        // 默认球速（米/秒）
 }
 
@@ -438,7 +438,7 @@ function generateRandomPoints(count) {
                 x: randomInRange(COURT_LIMITS.x.min, COURT_LIMITS.x.max),
                 y: randomInRange(1.5, 1.8),  // 击球高度范围
                 z: isBackCourt 
-                    ? randomInRange(0.1, 6.7)    // ��场范围
+                    ? randomInRange(0.1, 6.7)    // 场范围
                     : randomInRange(-6.7, -0.1)  // 前场范围
             };
         } else {
@@ -554,7 +554,15 @@ function playTrajectory() {
         try {
             emit('playTrajectory', validPoints, showTrajectory.value, trajectoryConfigs.value)
         } catch (error) {
-            message.warning(error.message)
+            dialog.warning({
+                title: '轨迹弧度不足',
+                content: error.message,
+                positiveText: '确定',
+                onPositiveClick: () => {
+                    // 重新预览轨迹
+                    playTrajectory()
+                }
+            })
             isPlaying.value = false
         }
         setTimeout(() => {
@@ -563,7 +571,7 @@ function playTrajectory() {
     }
 }
 
-// 修改播放成的处理���数
+// 修改播放成的处理数
 function handlePlayComplete() {
     isPlaying.value = false
 }
@@ -707,7 +715,7 @@ function updateTrajectoryConfigs(points) {
     for (let i = 0; i < validPoints.length - 1; i++) {
         const key = `P${i + 1}-P${i + 2}`  // 例如: "P1-P2"
         
-        // 如果已存在配置则保留否则使用默��配置
+        // 如果已存在配置则保留否则使用默配置
         if (!trajectoryConfigs.value[key]) {
             newConfigs[key] = { ...DEFAULT_TRAJECTORY_CONFIG }
         } else {
