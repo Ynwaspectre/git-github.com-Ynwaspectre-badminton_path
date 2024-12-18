@@ -12,8 +12,6 @@ import { useCourtStore } from '../stores/court'
 
 import { 
   COURT_CONFIG, 
-  PLAYER_POSITIONS, 
-  PLAYER_CONFIG,
   LIGHT_CONFIG,
 
 } from '../settings/scene'
@@ -69,7 +67,7 @@ onUnmounted(() => {
   if (shuttlecock.value) {
     scene.remove(shuttlecock.value)
   }
-  courtContainer.value?.removeEventListener('click', onMouseClick)
+  courtContainer.value?.removeEventListener('dblclick', onMouseClick)
 })
 
 function initThreeJS() {
@@ -354,71 +352,6 @@ watch(() => courtStore.selectedColor, (newColor) => {
 }, { immediate: true })
 
 
-// 修改 watch 函数中的玩家建逻辑
-watch(() => courtStore.selectedType, (newType) => {
-  // ... 清除现有玩家的代码保持不变 ...
-  if (newType !== 5 && scene) { // 5 是"都不"选项
-    // 清除现有球员
-    const playerGroups = scene.children.filter(child => child.type === 'player')
-    playerGroups.forEach(player => {
-      scene.remove(player)
-    })
-  }
-  // 创建员 根据setting.js中的PLAYER_POSITIONS
-  const positions = PLAYER_POSITIONS[newType]
-  if (positions) {
-    positions.forEach(pos => {
-      const playerInstance = createPlayer({
-        gender: pos.gender,
-        position: pos.position,
-        playerIndex: pos.index
-      })
-      scene.add(playerInstance)
-    })
-  }
-
-})
-
-// 创建球员的辅助函数
-function createPlayer(playerData) {
-  const group = new THREE.Group()
-  const config = PLAYER_CONFIG[playerData.gender]
-  const color = config.colors[playerData.playerIndex % 2]
-
-  // 创建头部
-  const headGeometry = new THREE.SphereGeometry(0.12, 16, 16)
-  const headMaterial = new THREE.MeshStandardMaterial({
-    color: color,
-    roughness: 0.7
-  })
-  const head = new THREE.Mesh(headGeometry, headMaterial)
-  head.position.y = config.height - 0.12
-  group.add(head)
-
-  // 创建身体
-  const bodyGeometry = new THREE.CylinderGeometry(
-    config.shoulderWidth / 2,
-    config.shoulderWidth / 3,
-    config.height - 0.24,
-    8
-  )
-  const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: color,
-    roughness: 0.7
-  })
-  const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
-  body.position.y = (config.height - 0.24) / 2
-  group.add(body)
-
-  // 设置位置
-  group.position.set(playerData.position.x, playerData.position.y || 0, playerData.position.z)
-  group.type = 'player'
-  group.userData = {
-    gender: playerData.gender,
-    playerIndex: playerData.playerIndex
-  }
-  return group
-}
 
 // 修改 createClearTrajectory 函数名为更��用的名称
 function showTrajectory(type) {
@@ -436,8 +369,8 @@ function clearPreview() {
 }
 
 // 添加播放轨迹方法
-function playTrajectory(points) {
-  trajectoryManager.playTrajectory(points)
+function playTrajectory(points, showTrajectory, configs) {
+  trajectoryManager.playTrajectory(points, showTrajectory, configs)
 }
 
 // 添加清除方法
@@ -473,12 +406,12 @@ function onMouseClick(event) {
 // 添加开始/停止收集点位的方法
 function startCollectingPoints() {
   isCollectingPoints.value = true
-  courtContainer.value.addEventListener('click', onMouseClick)
+  courtContainer.value.addEventListener('dblclick', onMouseClick)
 }
 
 function stopCollectingPoints() {
   isCollectingPoints.value = false
-  courtContainer.value.removeEventListener('click', onMouseClick)
+  courtContainer.value.removeEventListener('dblclick', onMouseClick)
 }
 
 // 暴露方法供父组件使用

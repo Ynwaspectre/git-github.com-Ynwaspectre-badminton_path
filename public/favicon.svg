@@ -1,0 +1,16 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 羽毛球头部（白色圆形） -->
+  <circle cx="16" cy="12" r="6" fill="white" stroke="#333" stroke-width="1.5"/>
+  
+  <!-- 羽毛部分（扇形排列） -->
+  <path d="M16 13L20 24M16 13L16 26M16 13L12 24" 
+        stroke="white" 
+        stroke-width="3" 
+        stroke-linecap="round"/>
+  
+  <!-- 装饰线条 -->
+  <path d="M13 10L19 10" 
+        stroke="#333" 
+        stroke-width="1.5" 
+        stroke-linecap="round"/>
+</svg> 

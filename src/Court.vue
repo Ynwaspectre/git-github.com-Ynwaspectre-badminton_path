@@ -29,6 +29,10 @@ import { ArrowDown } from '@vicons/ionicons5'
 
 // 添加拖拽状态跟踪
 const isDragging = ref(false)
+let lastClickTime = 0
+let lastClickPosition = { x: 0, y: 0 }
+const DOUBLE_CLICK_DELAY = 300  // 双击间隔时间（毫秒）
+const POSITION_THRESHOLD = 5    // 双击位置差异阈值（像素）
 
 // ... 其他代码保持不变 ...
 
@@ -70,13 +74,30 @@ function initControls() {
 function initMouseEvents() {
   const canvas = renderer.domElement
   
-  canvas.addEventListener('dblclick', (event) => {
-    onCanvasClick(event)
+  canvas.addEventListener('click', (event) => {
+    const currentTime = Date.now()
+    const timeDiff = currentTime - lastClickTime
+    const positionDiff = Math.sqrt(
+      Math.pow(event.clientX - lastClickPosition.x, 2) +
+      Math.pow(event.clientY - lastClickPosition.y, 2)
+    )
+    
+    if (timeDiff < DOUBLE_CLICK_DELAY && positionDiff < POSITION_THRESHOLD) {
+      // 双击触发
+      onCanvasClick(event)
+      lastClickTime = 0  // 重置时间，防止连续触发
+      lastClickPosition = { x: 0, y: 0 }  // 重置位置
+    } else {
+      lastClickTime = currentTime
+      lastClickPosition = { x: event.clientX, y: event.clientY }
+    }
   })
 }
 
 // 修改点击事件处理
 function onCanvasClick(event) {
+  // 如果正在拖拽，不处理点击
+  if (isDragging.value) return
   if (!isCollecting.value) return
   
   const rect = renderer.domElement.getBoundingClientRect()
@@ -84,15 +105,21 @@ function onCanvasClick(event) {
   const y = -((event.clientY - rect.top) / rect.height) * 2 + 1
 
   raycaster.setFromCamera(new THREE.Vector2(x, y), camera)
-  const intersects = raycaster.intersectObject(court)
+  const intersects = raycaster.intersectObjects([
+    court,
+    ...trajectoryManager.markers.map(m => m.marker)
+  ], true)
 
   if (intersects.length > 0) {
-    const point = intersects[0].point
-    emit('pointSelected', {
-      x: point.x,
-      y: point.y,
-      z: point.z
-    })
+    const firstIntersect = intersects[0].object
+    if (firstIntersect === court) {
+      const point = intersects[0].point
+      emit('pointSelected', {
+        x: point.x,
+        y: point.y,
+        z: point.z
+      })
+    }
   }
 }
 
@@ -106,7 +133,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   // 清理事件监听
   const canvas = renderer.domElement
-  canvas.removeEventListener('dblclick')
+  canvas.removeEventListener('click')
   controls.dispose()
   // ... 其他清理代码 ...
 })

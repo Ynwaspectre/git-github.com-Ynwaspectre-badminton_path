@@ -16,6 +16,7 @@ export class TrajectoryManager {
     this.currentTrajectoryPoints = []
     this.onPlayComplete = onPlayComplete
     this.isPreviewMode = false
+    this.showTrajectory = true
   }
 
   createClearTrajectory() {
@@ -48,7 +49,7 @@ export class TrajectoryManager {
     this.createShuttlecock()
 
     // 开始动画
-    this.startAnimation(points)
+    this.startAnimation(points, this.showTrajectory)
   }
 
   calculateTrajectory(start, end, maxHeight) {
@@ -206,14 +207,12 @@ export class TrajectoryManager {
     return heightCoefficient;
   }
 
-  startAnimation(points, showTrajectory = true) {
-    const shuttlecockSpeed = 3  // 米/秒
+  startAnimation(points, showTrajectory = true, trajectoryConfigs = {}) {
     let currentIndex = 0
     let progress = 0
     let lastTime = performance.now()
-    let trajectoryPoints = []  // 始终存储点位，但只在需要时显示
+    let trajectoryPoints = []
     
-    // 计��两点之间的抛物线
     const calculateParabolicPoint = (start, end, progress) => {
       const x = start.x + (end.x - start.x) * progress;
       const z = start.z + (end.z - start.z) * progress;
@@ -224,9 +223,11 @@ export class TrajectoryManager {
         Math.pow(end.z - start.z, 2)
       );
       
-      // 动态计算高度系数
-      const heightCoefficient = this.checkTrajectoryAndGetHeight(start, end);
-      const maxHeight = Math.max(start.y, end.y) + distance * heightCoefficient;
+      // 获取当前轨迹的配置
+      const configKey = `P${currentIndex + 1}-P${currentIndex + 2}`
+      const config = trajectoryConfigs[configKey] || { arcHeight: 0.15, speed: 3 }
+      
+      const maxHeight = Math.max(start.y, end.y) + distance * config.arcHeight;
       
       // 计算Y坐标
       const baseY = start.y + (end.y - start.y) * progress;
@@ -250,7 +251,12 @@ export class TrajectoryManager {
           Math.pow(nextPoint.z - currentPoint.z, 2)
         )
         
-        progress += (shuttlecockSpeed * deltaTime) / distance
+        // 获取当前轨迹的配置
+        const configKey = `P${currentIndex + 1}-P${currentIndex + 2}`
+        const config = trajectoryConfigs[configKey] || { arcHeight: 0.15, speed: 3 }
+        
+        // 使用配置中的速度
+        progress += (config.speed * deltaTime) / distance
         
         if (progress <= 1) {
           // 计算当前位置
@@ -337,13 +343,27 @@ export class TrajectoryManager {
           currentIndex++
           
           if (currentIndex >= points.length - 1) {
-            // 动画结束，清并调用回调
+            // 确保羽毛球到达最后一个点
+            if (this.shuttlecock) {
+              const lastPoint = points[points.length - 1]
+              this.shuttlecock.position.set(lastPoint.x, lastPoint.y, lastPoint.z)
+            }
+            
+            // 动画结束，清理并调用回调
             cancelAnimationFrame(this.animationFrameId)
             this.animationFrameId = null
-            this.cleanup(true)  // 保留标记点
-            if (this.onPlayComplete) {
-              this.onPlayComplete()
-            }
+            
+            // 延迟清理，让观众能看到最后的位置
+            setTimeout(() => {
+              this.cleanup(true)  // 保留标记点
+              if (this.shuttlecock) {
+                this.scene.remove(this.shuttlecock)
+                this.shuttlecock = null
+              }
+              if (this.onPlayComplete) {
+                this.onPlayComplete()
+              }
+            }, 500)
           } else {
             // 继续下一段动画
             this.animationFrameId = requestAnimationFrame(animate)
@@ -376,19 +396,7 @@ export class TrajectoryManager {
       this.trajectoryLine = null
     }
 
-    // 修改羽毛球的清理逻辑
     if (this.shuttlecock) {
-      // 递归清理所有网格
-      this.shuttlecock.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose()
-          child.material.dispose()
-        }
-        if (child instanceof THREE.Line) {
-          child.geometry.dispose()
-          child.material.dispose()
-        }
-      })
       this.scene.remove(this.shuttlecock)
       this.shuttlecock = null
     }
@@ -447,7 +455,7 @@ export class TrajectoryManager {
   previewPoints(points) {
     this.clearMarkers()
     
-    // 如果没有点位或只有一个点位，也要显示
+    // 如果没有点位或只有一个点位，要显示
     if (!points || points.length === 0) return
     
     // 创建新的标记点
@@ -479,7 +487,7 @@ export class TrajectoryManager {
 
   // 创建标记点
   createMarker(point, index) {
-    const geometry = new THREE.SphereGeometry(0.1)
+    const geometry = new THREE.SphereGeometry(0.08)  // 调整球体尺寸为0.08
     const material = new THREE.MeshBasicMaterial({ 
       color: 0xffff00,
       opacity: 0.8,
@@ -491,18 +499,18 @@ export class TrajectoryManager {
     
     // 添加点的序号
     const canvas = document.createElement('canvas')
-    canvas.width = 128  // 更大的画布提高清晰度
+    canvas.width = 128
     canvas.height = 128
     const context = canvas.getContext('2d')
-    context.font = 'Bold 72px Arial'  // 更大更粗的字体
+    context.font = 'Bold 64px Arial'
     context.fillStyle = 'white'
     context.strokeStyle = 'black'
     context.lineWidth = 4
     context.textAlign = 'center'
     context.textBaseline = 'middle'
     const text = (index + 1).toString()
-    context.strokeText(text, 64, 64)  // 先绘制描边
-    context.fillText(text, 64, 64)    // 再填充文字
+    context.strokeText(text, 64, 64)
+    context.fillText(text, 64, 64)
     
     const texture = new THREE.CanvasTexture(canvas)
     const spriteMaterial = new THREE.SpriteMaterial({ map: texture })
@@ -510,21 +518,93 @@ export class TrajectoryManager {
     sprite.position.copy(marker.position)
     sprite.position.x += 0.15
     sprite.position.y += 0.15
-    sprite.scale.set(0.25, 0.25, 1)  // 稍微调整大小
+    sprite.scale.set(0.2, 0.2, 1)
     this.scene.add(sprite)
     
     return { marker, sprite }
   }
 
   // 播放轨迹
-  playTrajectory(points, showTrajectory = true) {
-    // 清理现有内容
-    this.cleanup(true);
+  playTrajectory(points, showTrajectory = true, trajectoryConfigs = {}) {
+    // 先验证所有轨迹
+    for (let i = 0; i < points.length - 1; i++) {
+      const start = points[i];
+      const end = points[i + 1];
+      const configKey = `P${i + 1}-P${i + 2}`;
+      const config = trajectoryConfigs[configKey] || { arcHeight: 0.15, speed: 3 };
+      
+      const checkResult = this.checkTrajectoryConfig(start, end, config);
+      if (!checkResult.valid) {
+        // 如果轨迹无效，更新配置并提示用户
+        trajectoryConfigs[configKey].arcHeight = checkResult.minCoefficient;
+        throw new Error(
+          `轨迹${configKey}以当前弧度(${config.arcHeight.toFixed(2)})会触碰网，` +
+          `网处高度为${checkResult.currentHeight.toFixed(2)}米，` +
+          `已自动调整为${checkResult.minCoefficient.toFixed(2)}`
+        );
+      }
+    }
 
-    // 创建羽毛球和开始动画
-    this.showTrajectory = showTrajectory;
-    this.createShuttlecock();
-    this.startAnimation(points, showTrajectory);
+    // 清理轨迹线但保留标记点，不清理羽毛球
+    if (this.trajectoryLine) {
+      this.scene.remove(this.trajectoryLine);
+      this.trajectoryLine.geometry.dispose();
+      this.trajectoryLine.material.dispose();
+      this.trajectoryLine = null;
+    }
+
+    // 如果没有羽毛球，创建一个
+    if (!this.shuttlecock) {
+      this.createShuttlecock();
+    }
+
+    // 开始动画
+    this.startAnimation(points, showTrajectory, trajectoryConfigs);
+  }
+
+  // 添加轨迹验证方法
+  checkTrajectoryConfig(start, end, config) {
+    const distance = Math.sqrt(
+      Math.pow(end.x - start.x, 2) +
+      Math.pow(end.z - start.z, 2)
+    );
+    
+    // 如果不需要过网，直接返回 true
+    if (start.z * end.z >= 0) {
+      return { valid: true };
+    }
+    
+    // 计算网处的位置
+    const netProgress = -start.z / (end.z - start.z);
+    const baseNetY = start.y + (end.y - start.y) * netProgress;
+    
+    const maxHeight = Math.max(start.y, end.y) + distance * config.arcHeight;
+    const heightAtNet = baseNetY + Math.sin(Math.PI * netProgress) * 
+                       (maxHeight - Math.max(start.y, end.y));
+    
+    const NET_HEIGHT = 1.55;
+    const MIN_CLEARANCE = 0.2;
+    
+    // 如果高度不够，计算所需的最小弧度
+    if (heightAtNet < NET_HEIGHT + MIN_CLEARANCE) {
+      let minCoefficient = config.arcHeight;
+      let currentHeight = heightAtNet;
+      
+      while (currentHeight < NET_HEIGHT + MIN_CLEARANCE && minCoefficient < 0.5) {
+        minCoefficient += 0.05;
+        const newMaxHeight = Math.max(start.y, end.y) + distance * minCoefficient;
+        currentHeight = baseNetY + Math.sin(Math.PI * netProgress) * 
+                       (newMaxHeight - Math.max(start.y, end.y));
+      }
+      
+      return {
+        valid: false,
+        minCoefficient,
+        currentHeight: heightAtNet
+      };
+    }
+    
+    return { valid: true };
   }
 
   // 添加新方法，预先计算所有路线的弧度

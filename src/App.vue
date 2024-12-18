@@ -38,8 +38,8 @@ function handlePreviewPoints(points) {
   courtRef.value?.previewPoints(points)
 }
 
-function handlePlayTrajectory(points) {
-  courtRef.value?.playTrajectory(points)
+function handlePlayTrajectory(points, showTrajectory, configs) {
+  courtRef.value?.playTrajectory(points, showTrajectory, configs)
 }
 
 function handleClearPoints() {

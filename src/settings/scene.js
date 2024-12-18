@@ -30,68 +30,6 @@ export const COURT_CONFIG = {
   }
 }
 
-// 玩家配置
-export const PLAYER_CONFIG = {
-  male: {
-    height: 1.75,
-    shoulderWidth: 0.45,
-    colors: [
-      0x2196F3,  // 第一个男球员 - 蓝色
-      0x3F51B5   // 第二个男球员 - 深蓝色
-    ]
-  },
-  female: {
-    height: 1.65,
-    shoulderWidth: 0.4,
-    colors: [
-      0xFF4081,  // 第一个女球员 - 粉色
-      0xE91E63   // 第二个女球员 - 深粉色
-    ]
-  }
-}
-
-// 玩家初始位置配置
-export const PLAYER_POSITIONS = {
-  0: { // 男单
-    male: [
-      { x: -1, z: -4, y: 0, index: 0 },  // 上场男球员
-      { x: 1, z: 4, y: 0, index: 1 }     // 下场男球员
-    ]
-  },
-  1: { // 女单
-    female: [
-      { x: -1, z: -4, y: 0, index: 0 },  // 上场女球员
-      { x: 1, z: 4, y: 0, index: 1 }     // 下场女球员
-    ]
-  },
-  2: { // 男双
-    male: [
-      { x: -1.5, z: -4, y: 0, index: 0 },
-      { x: 1.5, z: -4, y: 0, index: 0 },
-      { x: -1.5, z: 4, y: 0, index: 1 },
-      { x: 1.5, z: 4, y: 0, index: 1 }
-    ]
-  },
-  3: { // 女双
-    female: [
-      { x: -1.5, z: -4, y: 0, index: 0 },
-      { x: 1.5, z: -4, y: 0, index: 0 },
-      { x: -1.5, z: 4, y: 0, index: 1 },
-      { x: 1.5, z: 4, y: 0, index: 1 }
-    ]
-  },
-  4: { // 混双
-    male: [
-      { x: -1.5, z: -4, y: 0, index: 0 },
-      { x: -1.5, z: 4, y: 0, index: 0 }
-    ],
-    female: [
-      { x: 1.5, z: -4, y: 0, index: 1 },
-      { x: 1.5, z: 4, y: 0, index: 1 }
-    ]
-  }
-}
-
 // 光照配置
 export const LIGHT_CONFIG = {
   ambient: {
@@ -131,7 +69,7 @@ export const TRAJECTORY_CONFIG = {
       flightTime: 1.2,       // 飞行时间（秒）
       points: 100,           // 轨迹点数量
       startArea: {
-        x: [-2, 2],         // 击球点���左右范围
+        x: [-2, 2],         // 击球点左右范围
         y: [1.5, 1.8],      // 击球高度范围
         z: [-5, -3]         // 击球深度范围
       },
