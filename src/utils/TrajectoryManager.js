@@ -5,6 +5,35 @@ import {
   calculateDriveTrajectory,
   calculateSmashTrajectory 
 } from '../settings/scene'
+import { Player } from './Player'
+import { PLAYER_POSITIONS } from '../settings/player'
+
+// 计算抛物线上的点
+function calculateParabolicPoint(start, end, t) {
+  // 线性插值计算 x 和 z 坐标
+  const x = start.x + (end.x - start.x) * t
+  const z = start.z + (end.z - start.z) * t
+  
+  // 计算两点间的距离
+  const distance = Math.sqrt(
+    Math.pow(end.x - start.x, 2) +
+    Math.pow(end.z - start.z, 2)
+  )
+  
+  // 计算抛物线高度
+  const maxHeight = Math.max(start.y, end.y) + distance * 0.2
+  
+  // 使用正弦函数创建抛物线效果
+  const y = start.y + (end.y - start.y) * t +
+           Math.sin(Math.PI * t) * (maxHeight - Math.max(start.y, end.y))
+  
+  // 确保过网高度
+  if (Math.abs(z) < 0.1) {
+    return { x, y: Math.max(y, 1.6), z }
+  }
+  
+  return { x, y, z }
+}
 
 export class TrajectoryManager {
   constructor(scene, onPlayComplete) {
@@ -13,10 +42,185 @@ export class TrajectoryManager {
     this.shuttlecock = null
     this.animationFrameId = null
     this.markers = []
+    this.returnPointMarkers = []  // 存储回位点标记
     this.currentTrajectoryPoints = []
     this.onPlayComplete = onPlayComplete
     this.isPreviewMode = false
     this.showTrajectory = true
+    this.showReturnPoints = true  // 默认显示回位点
+    this.players = []
+    this.playerPositions = {
+      initialPositions: {
+        singles: {
+          player1: { x: 0, z: -4 },
+          player2: { x: 0, z: 4 }
+        },
+        doubles: {
+          player1: { x: 1.5, z: -4 },
+          player2: { x: 1.5, z: 4 },
+          player3: { x: -1.5, z: -4 },
+          player4: { x: -1.5, z: 4 }
+        }
+      },
+      returnPoints: []
+    }
+    this.matchConfig = {
+      isDoubles: false,
+      gender: 'male'
+    }
+    this.initPlayers()
+    this.animating = false
+  }
+
+  initPlayers() {
+    console.log('Initializing players with config:', this.matchConfig)
+    this.players.forEach(player => player.dispose())
+    this.players = []
+
+    if (this.matchConfig.type === 'NONE') {
+      console.log('No players needed for this type')
+      return
+    }
+
+    switch (this.matchConfig.type) {
+      case 'SINGLES':  // 单打
+        this.players.push(
+          new Player(this.scene, { 
+            position: { 
+              x: this.playerPositions.initialPositions.singles.player1.x,
+              y: 0,
+              z: this.playerPositions.initialPositions.singles.player1.z
+            },
+            number: 1
+          }),
+          new Player(this.scene, { 
+            position: { 
+              x: this.playerPositions.initialPositions.singles.player2.x,
+              y: 0,
+              z: this.playerPositions.initialPositions.singles.player2.z
+            },
+            number: 2
+          })
+        )
+        break
+
+      case 'DOUBLES':  // 双打
+        this.players.push(
+          new Player(this.scene, { 
+            position: { 
+              x: this.playerPositions.initialPositions.doubles.player1.x,
+              y: 0,
+              z: this.playerPositions.initialPositions.doubles.player1.z
+            },
+            number: 1
+          }),
+          new Player(this.scene, { 
+            position: { 
+              x: this.playerPositions.initialPositions.doubles.player2.x,
+              y: 0,
+              z: this.playerPositions.initialPositions.doubles.player2.z
+            },
+            number: 2
+          }),
+          new Player(this.scene, { 
+            position: { 
+              x: this.playerPositions.initialPositions.doubles.player3.x,
+              y: 0,
+              z: this.playerPositions.initialPositions.doubles.player3.z
+            },
+            number: 3
+          }),
+          new Player(this.scene, { 
+            position: { 
+              x: this.playerPositions.initialPositions.doubles.player4.x,
+              y: 0,
+              z: this.playerPositions.initialPositions.doubles.player4.z
+            },
+            number: 4
+          })
+        )
+        break
+    }
+
+    // 检查是否有现存的点位，如果有，移动对应球员
+    this.alignPlayersWithPoints()
+  }
+
+  // 新增方法：将球员与现有点位对齐
+  alignPlayersWithPoints() {
+    // 检查是否是单打比赛且有点位
+    if (!this.matchConfig.isDoubles && 
+        this.currentTrajectoryPoints && 
+        this.currentTrajectoryPoints.length > 0) {
+      const firstPoint = this.currentTrajectoryPoints[0]
+      console.log('Aligning players with first point:', firstPoint)
+      this.movePlayerToFirstPoint(firstPoint)
+    }
+  }
+
+  // 移动球员到第一个点位
+  movePlayerToFirstPoint(point) {
+    console.log('Moving player to point:', point)
+    if (!this.matchConfig.isDoubles && this.players.length > 0) {
+      const isPointFrontCourt = point.z < 0
+      
+      // 找到对应半场的球员并移动
+      this.players.forEach(player => {
+        const isPlayerFrontCourt = player.position.z < 0
+        if (isPlayerFrontCourt === isPointFrontCourt) {
+          player.moveTo({ x: point.x, z: point.z })
+        }
+      })
+
+      // 启动动画循环
+      if (!this.animating) {
+        this.animating = true
+        this.animate()
+      }
+    }
+  }
+
+  // 添加独立的动画循环
+  animate() {
+    if (!this.animating) return
+    
+    const currentTime = performance.now()
+    const deltaTime = (currentTime - (this.lastTime || currentTime)) / 1000
+    this.lastTime = currentTime
+    
+    // 更新所有球员位置
+    let anyPlayerMoving = false
+    this.players.forEach(player => {
+      player.update(deltaTime)
+      if (player.isMoving) anyPlayerMoving = true
+    })
+    
+    // 如果所有球员都停止移动，结束动画循环
+    if (!anyPlayerMoving) {
+      this.animating = false
+      return
+    }
+    
+    requestAnimationFrame(() => this.animate())
+  }
+
+  // 更新比赛类型
+  updateMatchType(config) {
+    console.log('Updating match type:', config)
+    this.matchConfig = {
+      ...config.config,
+      type: config.type
+    }
+    // 保存当前点位
+    const currentPoints = [...this.currentTrajectoryPoints]
+    // 确保清理现有球员
+    this.players.forEach(player => player.dispose())
+    this.players = []
+    this.initPlayers()
+    // 恢复点位
+    this.currentTrajectoryPoints = currentPoints
+    // 重新对齐球员
+    this.alignPlayersWithPoints()
   }
 
   createClearTrajectory() {
@@ -90,11 +294,12 @@ export class TrajectoryManager {
       dashSize: 0.3,    // 减小虚线段长度
       gapSize: 0.2,     // 减小间隙长度
       transparent: true,
-      opacity: 0.8
+      opacity: 1
     })
 
     this.trajectoryLine = new THREE.Line(geometry, material)
     this.trajectoryLine.computeLineDistances()  // 必须调用此方法才能显示虚线
+    this.trajectoryLine.visible = true
     this.scene.add(this.trajectoryLine)
   }
 
@@ -211,126 +416,59 @@ export class TrajectoryManager {
     let currentIndex = 0
     let progress = 0
     let lastTime = performance.now()
-    let trajectoryPoints = []
-    
-    const calculateParabolicPoint = (start, end, progress) => {
-      const x = start.x + (end.x - start.x) * progress;
-      const z = start.z + (end.z - start.z) * progress;
-      
-      // 计算水平距离
-      const distance = Math.sqrt(
-        Math.pow(end.x - start.x, 2) +
-        Math.pow(end.z - start.z, 2)
-      );
-      
-      // 获取当前轨迹的配置
-      const configKey = `P${currentIndex + 1}-P${currentIndex + 2}`
-      const config = trajectoryConfigs[configKey] || { arcHeight: 0.15, speed: 3 }
-      
-      const maxHeight = Math.max(start.y, end.y) + distance * config.arcHeight;
-      
-      // 计算Y坐标
-      const baseY = start.y + (end.y - start.y) * progress;
-      const parabolicY = Math.sin(Math.PI * progress) * (maxHeight - Math.max(start.y, end.y));
-      const y = baseY + parabolicY;
-      
-      return { x, y, z, maxHeight };
-    };
-    
+    this._hitComplete = false  // 重置击球完成状态
+
     const animate = (currentTime) => {
       const deltaTime = (currentTime - lastTime) / 1000
       lastTime = currentTime
-      
+
+      // 更新球员位置
+      this.players.forEach(player => player.update(deltaTime))
+
       if (currentIndex < points.length - 1) {
-        const currentPoint = points[currentIndex]
-        const nextPoint = points[currentIndex + 1]
+        const start = points[currentIndex]
+        const end = points[currentIndex + 1]
         
-        const distance = Math.sqrt(
-          Math.pow(nextPoint.x - currentPoint.x, 2) +
-          Math.pow(nextPoint.y - currentPoint.y, 2) +
-          Math.pow(nextPoint.z - currentPoint.z, 2)
-        )
+        progress += deltaTime
+        const t = this.easeInOutQuad(Math.min(progress / 1, 1))
         
-        // 获取当前轨迹的配置
-        const configKey = `P${currentIndex + 1}-P${currentIndex + 2}`
-        const config = trajectoryConfigs[configKey] || { arcHeight: 0.15, speed: 3 }
-        
-        // 使用配置中的速度
-        progress += (config.speed * deltaTime) / distance
-        
-        if (progress <= 1) {
-          // 计算当前位置
-          const currentPos = calculateParabolicPoint(currentPoint, nextPoint, progress)
+        // 更新羽毛球位置
+        if (this.shuttlecock) {
+          const pos = calculateParabolicPoint(start, end, t)
+          this.shuttlecock.position.set(pos.x, pos.y, pos.z)
           
-          // 更新羽毛球位置和朝向
-          if (this.shuttlecock) {
-            this.shuttlecock.position.set(currentPos.x, currentPos.y, currentPos.z)
-            
-            // 计算移动方向
-            const direction = new THREE.Vector3()
-            if (progress < 1) {
-              // 使用当前点到下一点的方向
-              direction.subVectors(nextPoint, currentPos).normalize()
-            } else {
-              // 使用前一点到当前点的方向
-              direction.subVectors(currentPos, currentPoint).normalize()
-            }
+          // 计算方向向量
+          const direction = new THREE.Vector3(
+            end.x - start.x,
+            end.y - start.y,
+            end.z - start.z
+          ).normalize()
+          
+          // 应用旋转
+          this.shuttlecock.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            direction
+          )
+        }
 
-            // 计算旋转四元数
-            const quaternion = new THREE.Quaternion()
-            const up = new THREE.Vector3(0, 1, 0)
-            const right = new THREE.Vector3().crossVectors(up, direction).normalize()
-            up.crossVectors(direction, right)
-
-            // 创建旋转矩阵
-            const rotationMatrix = new THREE.Matrix4()
-            rotationMatrix.makeBasis(right, up, direction)
-            quaternion.setFromRotationMatrix(rotationMatrix)
-
-            // 用旋转
-            this.shuttlecock.setRotationFromQuaternion(quaternion)
-            
-            // 额外旋转使球头朝动方向
-            this.shuttlecock.rotateX(Math.PI / 2)
+        // 更新轨迹线
+        if (showTrajectory) {
+          const linePoints = []
+          // 添加当前段的部分轨迹
+          const segments = 50  // 增加细分数，使轨迹更平滑
+          for (let j = 0; j <= Math.floor(t * segments); j++) {
+            const segmentT = j / segments
+            linePoints.push(calculateParabolicPoint(start, end, segmentT))
           }
+          this.createTrajectoryLine(linePoints)
+        }
+        
+        if (progress >= 1) {
+          currentIndex++
+          progress = 0
+          this._hitComplete = false  // 重置击球完成状态
           
-          // 始终添加点位
-          trajectoryPoints.push(currentPos)
-          
-          // 更新轨迹线
-          if (this.trajectoryLine) {
-            this.scene.remove(this.trajectoryLine)
-            this.trajectoryLine.geometry.dispose()
-            this.trajectoryLine.material.dispose()
-          }
-          
-          // 创建新的轨迹线
-          const geometry = new THREE.BufferGeometry()
-          const vertices = []
-          trajectoryPoints.forEach(point => {
-            vertices.push(point.x, point.y, point.z)
-          })
-          geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
-          
-          const material = new THREE.LineDashedMaterial({
-            color: 0xffffff,
-            linewidth: 2,
-            scale: 1,
-            dashSize: 0.3,
-            gapSize: 0.2,
-            transparent: true,
-            opacity: 0.8
-          })
-          
-          this.trajectoryLine = new THREE.Line(geometry, material)
-          this.trajectoryLine.computeLineDistances()
-          this.trajectoryLine.visible = showTrajectory  // 根据 showTrajectory 控制可见性
-          this.scene.add(this.trajectoryLine)
-          
-          this.animationFrameId = requestAnimationFrame(animate)
-        } else {
-          // 清除当前轨迹
-          trajectoryPoints = []
+          // 清除上一段轨迹
           if (this.trajectoryLine) {
             this.scene.remove(this.trajectoryLine)
             this.trajectoryLine.geometry.dispose()
@@ -338,44 +476,86 @@ export class TrajectoryManager {
             this.trajectoryLine = null
           }
           
-          // 进入下一段
-          progress = 0
-          currentIndex++
-          
-          if (currentIndex >= points.length - 1) {
-            // 确保羽毛球到达最后一个点
-            if (this.shuttlecock) {
-              const lastPoint = points[points.length - 1]
-              this.shuttlecock.position.set(lastPoint.x, lastPoint.y, lastPoint.z)
+          // 处理下一段轨迹的球员移动
+          if (currentIndex < points.length - 1) {
+            const configKey = `P${currentIndex + 1}-P${currentIndex + 2}`
+            const config = trajectoryConfigs[configKey] || {}
+            
+            if (config.hitConfig) {
+              // 直接使用配置中指定的击球员
+              const actualHitterId = config.hitConfig.hitterId
+              const hitter = this.players[actualHitterId - 1]
+              if (hitter) {
+                console.log(`${actualHitterId}号球员移动到击球点(${points[currentIndex].x.toFixed(2)}, ${points[currentIndex].z.toFixed(2)})`)
+                hitter.moveTo(points[currentIndex])
+              }
+
+              // 让伙伴移动到击球时的位置
+              if (this.matchConfig.isDoubles) {
+                const partnerId = actualHitterId % 2 === 1 ? actualHitterId + 2 : actualHitterId + 2
+                const partner = this.players[partnerId - 1]
+                if (partner && config.hitConfig.partnerStandPoint) {
+                  console.log(`${partnerId}号球员(伙伴)移动到站位点(${config.hitConfig.partnerStandPoint.x.toFixed(2)}, ${config.hitConfig.partnerStandPoint.z.toFixed(2)})`)
+                  partner.moveTo(config.hitConfig.partnerStandPoint)
+                }
+              }
             }
-            
-            // 动画结束，清理并调用回调
-            cancelAnimationFrame(this.animationFrameId)
-            this.animationFrameId = null
-            
-            // 延迟清理，让观众能看到最后的位置
-            setTimeout(() => {
-              this.cleanup(true)  // 保留标记点
-              if (this.shuttlecock) {
-                this.scene.remove(this.shuttlecock)
-                this.shuttlecock = null
-              }
-              if (this.onPlayComplete) {
-                this.onPlayComplete()
-              }
-            }, 500)
-          } else {
-            // 继续下一段动画
-            this.animationFrameId = requestAnimationFrame(animate)
           }
         }
+        
+        // 检查是否完成击球动作（进度超过50%）
+        if (progress > 0.5 && !this._hitComplete) {
+          this._hitComplete = true
+          const config = trajectoryConfigs[`P${currentIndex + 1}-P${currentIndex + 2}`]
+          
+          if (config?.hitConfig) {
+            console.log(`===== 击球后回退 =====`)
+            // 直接使用配置中指定的击球员
+            const actualHitterId = config.hitConfig.hitterId
+
+            // 让击球员回退
+            const hitter = this.players[actualHitterId - 1]
+            if (hitter) {
+              console.log(`${actualHitterId}号球员回退到(${config.hitConfig.hitterReturnPoint.x.toFixed(2)}, ${config.hitConfig.hitterReturnPoint.z.toFixed(2)})`)
+              hitter.moveTo(config.hitConfig.hitterReturnPoint)
+            }
+            
+            // 让伙伴回退
+            if (this.matchConfig.isDoubles) {
+              const partnerId = actualHitterId === 1 ? 3 : 
+                              actualHitterId === 2 ? 4 :
+                              actualHitterId === 3 ? 1 : 2
+              const partner = this.players[partnerId - 1]
+              if (partner) {
+                console.log(`${partnerId}号球员(伙伴)回退到(${config.hitConfig.partnerReturnPoint.x.toFixed(2)}, ${config.hitConfig.partnerReturnPoint.z.toFixed(2)})`)
+                partner.moveTo(config.hitConfig.partnerReturnPoint)
+              }
+            }
+          }
+        }
+        
+        this.animationFrameId = requestAnimationFrame(animate)
       } else {
-        // 移除这个 else 分支，因为它导致了重复的回调
-        cancelAnimationFrame(this.animationFrameId)
-        this.animationFrameId = null
+        // 清除轨迹线和羽毛球
+        if (this.trajectoryLine) {
+          this.scene.remove(this.trajectoryLine)
+          this.trajectoryLine.geometry.dispose()
+          this.trajectoryLine.material.dispose()
+          this.trajectoryLine = null
+        }
+        
+        if (this.shuttlecock) {
+          this.scene.remove(this.shuttlecock)
+          this.shuttlecock = null
+        }
+
+        // 调用完成回调
+        if (this.onPlayComplete) {
+          this.onPlayComplete()
+        }
       }
     }
-    
+
     this.animationFrameId = requestAnimationFrame(animate)
   }
 
@@ -412,6 +592,18 @@ export class TrajectoryManager {
       this.markers = []
     }
     this.currentTrajectoryPoints = []
+
+    this.players.forEach(player => player.dispose())
+    this.players = []
+    this.initPlayers()
+
+    // 清除回位点标记
+    this.returnPointMarkers.forEach(marker => {
+      this.scene.remove(marker)
+      marker.geometry.dispose()
+      marker.material.dispose()
+    })
+    this.returnPointMarkers = []
   }
 
   dispose() {
@@ -465,6 +657,7 @@ export class TrajectoryManager {
     })
     
     this.isPreviewMode = true
+    this.currentTrajectoryPoints = points
   }
 
   // 清除预览点位
@@ -525,41 +718,51 @@ export class TrajectoryManager {
   }
 
   // 播放轨迹
-  playTrajectory(points, showTrajectory = true, trajectoryConfigs = {}) {
-    // 先验证所有轨迹
-    for (let i = 0; i < points.length - 1; i++) {
-      const start = points[i];
-      const end = points[i + 1];
-      const configKey = `P${i + 1}-P${i + 2}`;
-      const config = trajectoryConfigs[configKey] || { arcHeight: 0.15, speed: 3 };
-      
-      const checkResult = this.checkTrajectoryConfig(start, end, config);
-      if (!checkResult.valid) {
-        // 如果轨迹无效，更新配置并提示用户
-        trajectoryConfigs[configKey].arcHeight = checkResult.minCoefficient;
-        throw new Error(
-          `轨迹${configKey}以当前弧度(${config.arcHeight.toFixed(2)})会触碰网，` +
-          `网处高度为${checkResult.currentHeight.toFixed(2)}米，` +
-          `已自动调整为${checkResult.minCoefficient.toFixed(2)}`
-        );
+  playTrajectory(points, configs) {
+    console.log('playTrajectory',  configs)
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId)
+    }
+
+    // 首先让指定的击球员移动到第一个击球点
+    const firstConfig = configs['P1-P2']
+    console.log('firstConfig', firstConfig)
+    if (firstConfig?.hitConfig) {
+      // 直接使用配置中指定的击球员
+      const actualHitterId = firstConfig.hitConfig.hitterId
+      const hitter = this.players[actualHitterId - 1]
+      if (hitter) {
+        console.log(`===== 开始预览轨迹 =====`)
+        console.log(`第一个击球点: P1(${points[0].x.toFixed(2)}, ${points[0].z.toFixed(2)})`)
+        console.log(`${actualHitterId}号球员移动到击球点`)
+
+        hitter.moveTo({
+          x: points[0].x,
+          z: points[0].z
+        })
+
+        // 如果是双打，还要移动伙伴
+        if (this.matchConfig.isDoubles) {
+          // 根据配置确定伙伴
+          const partnerId = actualHitterId % 2 === 1 ? actualHitterId + 2 : actualHitterId + 2
+          const partner = this.players[partnerId - 1]
+          if (partner && firstConfig.hitConfig.partnerStandPoint) {
+            console.log(`${partnerId}号球员(伙伴)移动到站位点(${firstConfig.hitConfig.partnerStandPoint.x.toFixed(2)}, ${firstConfig.hitConfig.partnerStandPoint.z.toFixed(2)})`)
+            partner.moveTo(firstConfig.hitConfig.partnerStandPoint)
+          }
+        }
       }
     }
 
-    // 清理轨迹线但保留标记点，不清理羽毛球
-    if (this.trajectoryLine) {
-      this.scene.remove(this.trajectoryLine);
-      this.trajectoryLine.geometry.dispose();
-      this.trajectoryLine.material.dispose();
-      this.trajectoryLine = null;
-    }
-
-    // 如果没有羽毛球，创建一个
-    if (!this.shuttlecock) {
-      this.createShuttlecock();
+    // 创建羽毛球并设置初始位置
+    this.createShuttlecock()
+    if (this.shuttlecock) {
+      const firstPoint = points[0]
+      this.shuttlecock.position.set(firstPoint.x, firstPoint.y, firstPoint.z)
     }
 
     // 开始动画
-    this.startAnimation(points, showTrajectory, trajectoryConfigs);
+    this.startAnimation(points, this.showTrajectory, configs)
   }
 
   // 添加轨迹验证方法
@@ -708,5 +911,169 @@ export class TrajectoryManager {
     if (this.trajectoryLine) {
       this.trajectoryLine.visible = visible
     }
+  }
+
+  // 添加新方法：设置球员初始位置
+  setInitialPositions() {
+    // 根据比赛类型设置初始位置
+    const isDoubles = this.matchConfig.isDoubles
+    this.players.forEach(player => {
+      const positions = isDoubles 
+        ? this.playerPositions.initialPositions.doubles
+        : this.playerPositions.initialPositions.singles
+      const position = positions[`player${player.number}`]
+      if (position) {
+        player.moveTo(position)
+      }
+    })
+  }
+
+  // 添加新方法：重置球员到初始位置
+  resetPlayersToInitialPositions() {
+    if (!this.matchConfig.isDoubles) {
+      this.players.forEach(player => {
+        // 使用新的位置配置结构
+        const position = this.playerPositions.initialPositions.singles[`player${player.number}`]
+        player.moveTo(position)
+      })
+    } else {
+      // 双打时的重置
+      this.players.forEach(player => {
+        const position = this.playerPositions.initialPositions.doubles[`player${player.number}`]
+        player.moveTo(position)
+      })
+    }
+  }
+
+  // 添加更新球员位置配置的方法
+  updatePlayerPositions(positions) {
+    console.log('Updating player positions:', positions)
+    // 处理初始位置更新
+    if (positions.shouldUpdateInitialPositions) {
+      // 更新配置
+      if (positions.currentPositions) {
+        const isDoubles = this.matchConfig.isDoubles
+        if (isDoubles) {
+          this.playerPositions.initialPositions.doubles = positions.currentPositions
+        } else {
+          this.playerPositions.initialPositions.singles = positions.currentPositions
+        }
+      }
+
+      // 移动球员到新位置
+      this.players.forEach(player => {
+        const isDoubles = this.matchConfig.isDoubles
+        const currentPositions = isDoubles 
+          ? this.playerPositions.initialPositions.doubles
+          : this.playerPositions.initialPositions.singles
+        const playerPosition = currentPositions[`player${player.number}`]
+
+        if (playerPosition) {
+          console.log(`Moving player ${player.number} to:`, playerPosition)
+          player.moveTo(playerPosition)
+        }
+      })
+
+      // 启动动画循环
+      if (!this.animating) {
+        this.animating = true
+        this.animate()
+      }
+      return
+    }
+
+    // 处理回位点更新
+    if (positions.returnPoints) {
+      console.log('更新回位点:', positions.returnPoints)
+      this.playerPositions.returnPoints = positions.returnPoints
+      this.updateReturnPointMarkers()  // 更新回位点标记
+    }
+  }
+
+  // 更新回位点标记
+  updateReturnPointMarkers() {
+    console.log('开始更新回位点标记')
+    
+    // 清除现有的光圈
+    this.returnPointMarkers.forEach(marker => {
+      this.scene.remove(marker)
+      marker.geometry.dispose()
+      marker.material.dispose()
+    })
+    this.returnPointMarkers = []
+    
+    // 如果不显示回位点，直接返回
+    if (!this.showReturnPoints) {
+      console.log('回位点显示已关闭')
+      return
+    }
+    
+    // 遍历所有回位点
+    this.playerPositions.returnPoints.forEach((point, index) => {
+      if (!point) return
+      
+      // 创建永久光圈
+      const geometry = new THREE.RingGeometry(0.2, 0.25, 32)
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.5,  // 增加不透明度
+        side: THREE.DoubleSide
+      })
+        
+      const marker = new THREE.Mesh(geometry, material)
+      marker.rotation.x = -Math.PI / 2
+      marker.position.set(point.x, 0.01, point.z)
+      this.scene.add(marker)
+      this.returnPointMarkers.push(marker)
+      console.log(`创建回位点光圈 P${index + 1}: (${point.x.toFixed(2)}, ${point.z.toFixed(2)})`)
+      
+      // 只记录位置信息，不包含速度
+      const positionState = JSON.stringify({ x: point.x, z: point.z })
+      
+      // 只在位置发生变化时显示临时光圈
+      if (this._lastPositions?.[index] !== positionState) {
+        console.log(`更新P${index + 1}的回位点: (${point.x.toFixed(2)}, ${point.z.toFixed(2)}), 回位速度: ${point.speed}m/s`)
+      
+        // 创建临时的高亮效果
+        const highlightGeometry = new THREE.RingGeometry(0.25, 0.3, 32)
+        const highlightMaterial = new THREE.MeshBasicMaterial({
+          color: 0x00ffff,
+          transparent: true,
+          opacity: 0.8,
+          side: THREE.DoubleSide
+        })
+        
+        const highlight = new THREE.Mesh(highlightGeometry, highlightMaterial)
+        highlight.rotation.x = -Math.PI / 2
+        highlight.position.set(point.x, 0.02, point.z)
+        this.scene.add(highlight)
+        
+        console.log(`添加P${index + 1}的回位点光圈，将在0.5秒后移除`)
+        // 0.5秒后移除高亮效果
+        setTimeout(() => {
+          this.scene.remove(highlight)
+          highlightGeometry.dispose()
+          highlightMaterial.dispose()
+          console.log(`移除P${index + 1}的回位点光圈`)
+        }, 500)
+        
+        // 更新状态记录
+        if (!this._lastPositions) this._lastPositions = {}
+        this._lastPositions[index] = positionState
+      }
+    })
+  }
+
+  // 更新回位点显示状态
+  updateReturnPointsVisibility(visible) {
+    console.log('更新回位点显示状态:', visible)
+    this.showReturnPoints = visible
+    if (visible) {
+      console.log('显示所有回位点光圈')
+    } else {
+      console.log('隐藏所有回位点光圈')
+    }
+    this.updateReturnPointMarkers()  // 立即更新光圈显示
   }
 } 

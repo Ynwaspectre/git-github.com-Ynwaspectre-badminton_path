@@ -18,6 +18,9 @@
             @clearPreview="handleClearPreview"
             @startCollectingPoints="handleStartCollectingPoints"
             @stopCollectingPoints="handleStopCollectingPoints"
+            @matchTypeChange="handleMatchTypeChange"
+            @playerMoveToPoint="handlePlayerMoveToPoint"
+            @updatePlayerPositions="handleUpdatePlayerPositions"
           />
         </div>
       </div>
@@ -47,6 +50,7 @@ function handleClearPoints() {
 }
 
 function handlePointSelected(point) {
+  console.log('App: handlePointSelected called with point:', point)
   settingsRef.value?.handlePointSelected(point)
 }
 
@@ -64,5 +68,18 @@ function handleClearPreview() {
 
 function handlePlayComplete() {
   settingsRef.value?.handlePlayComplete()
+}
+
+function handleMatchTypeChange(config) {
+  courtRef.value?.updateMatchType(config)
+}
+
+function handlePlayerMoveToPoint(point) {
+  console.log('App: handlePlayerMoveToPoint called with point:', point)
+  courtRef.value?.movePlayerToPoint(point)
+}
+
+function handleUpdatePlayerPositions(positions) {
+  courtRef.value?.updatePlayerPositions(positions)
 }
 </script> 

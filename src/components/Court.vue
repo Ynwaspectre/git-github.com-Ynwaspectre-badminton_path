@@ -353,7 +353,7 @@ watch(() => courtStore.selectedColor, (newColor) => {
 
 
 
-// 修改 createClearTrajectory 函数名为更��用的名称
+// 修改 createClearTrajectory 函数名为更用的名称
 function showTrajectory(type) {
   trajectoryManager.createTrajectory(type)
 }
@@ -422,6 +422,30 @@ defineExpose({
   playTrajectory,
   clearPoints,
   startCollectingPoints,
-  stopCollectingPoints
+  stopCollectingPoints,
+  updateMatchType,
+  movePlayerToPoint,
+  updatePlayerPositions
 })
+
+// 添加 updateMatchType 方法
+function updateMatchType(config) {
+  if (trajectoryManager) {
+    trajectoryManager.updateMatchType(config)
+  }
+}
+
+// 添加移动球员到点位的方法
+function movePlayerToPoint(point) {
+  if (trajectoryManager) {
+    trajectoryManager.movePlayerToFirstPoint(point)
+  }
+}
+
+// 添加更新球员位置的方法
+function updatePlayerPositions(positions) {
+  if (trajectoryManager) {
+    trajectoryManager.updatePlayerPositions(positions)
+  }
+}
 </script>
