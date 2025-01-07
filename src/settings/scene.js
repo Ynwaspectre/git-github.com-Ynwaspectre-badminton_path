@@ -23,7 +23,7 @@ export const COURT_CONFIG = {
   },
   colors:{
     background: 0x808080,
-    court: 0x4CAF50,
+    court: 0x607D8B,
     line: 0x4CAF50,
     net: 0x4CAF50,
     poles: 0x808080,

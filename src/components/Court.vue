@@ -13,12 +13,12 @@ import { useCourtStore } from '../stores/court'
 import { 
   COURT_CONFIG, 
   LIGHT_CONFIG,
-
 } from '../settings/scene'
+
 import { TrajectoryManager } from '../utils/TrajectoryManager'
 
 // 添加 emit 定义
-const emit = defineEmits(['pointSelected'])
+const emit = defineEmits(['pointSelected', 'playComplete'])
 
 const courtStore = useCourtStore()
 
@@ -32,8 +32,6 @@ let renderer
 let controls
 let trajectoryManager
 
-const settingsRef = ref(null)
-
 
 // 添加轨迹相关的状态
 const trajectoryLine = ref(null)
@@ -44,6 +42,8 @@ const mouse = new THREE.Vector2()
 let isCollectingPoints = ref(false)  // 是否正在收集点位
 let courtPlane  // 存储场地平面引用
 
+
+// 初始化 Three.js 场景
 onMounted(() => {
   initThreeJS()
   animate()
@@ -51,11 +51,12 @@ onMounted(() => {
     scene,
     () => {
       // 播放完成时的回调
-      settingsRef.value?.handlePlayComplete()
+      emit('playComplete')
     }
   )
 })
 
+// 卸载时清理
 onUnmounted(() => {
   renderer?.dispose()
   window.removeEventListener('resize', onWindowResize)
@@ -70,6 +71,7 @@ onUnmounted(() => {
   courtContainer.value?.removeEventListener('dblclick', onMouseClick)
 })
 
+// 初始化 Three.js 场景
 function initThreeJS() {
   scene = new THREE.Scene()
   scene.background = new THREE.Color('#404040')
@@ -145,6 +147,7 @@ function createCourt() {
   createNet()
 }
 
+// 创建场地线条
 function createCourtLines() {
   const lineMaterial = new THREE.MeshBasicMaterial({
     color: courtConfig.colors.lines,
@@ -189,6 +192,7 @@ function createCourtLines() {
   createLineRect(0, -length / 2 + doubleServiceLine, width, lineWidth) // 下双打发球线
 }
 
+// 创建网
 function createNet() {
   const { width, poleRadius } = courtConfig.dimensions
   const netHeightPoles = 1.55    // 网柱处的高度（1.55米）
@@ -292,6 +296,7 @@ function createNet() {
   scene.add(topBand)
 }
 
+// 创建灯光
 function createLighting() {
   // 环境光
   const ambientLight = new THREE.AmbientLight(LIGHT_CONFIG.ambient.color, LIGHT_CONFIG.ambient.intensity)
@@ -335,6 +340,7 @@ function onWindowResize() {
   renderer.setSize(width, height)
 }
 
+// 渲染循环
 function animate() {
   requestAnimationFrame(animate)
   controls.update()
@@ -353,10 +359,6 @@ watch(() => courtStore.selectedColor, (newColor) => {
 
 
 
-// 修改 createClearTrajectory 函数名为更用的名称
-function showTrajectory(type) {
-  trajectoryManager.createTrajectory(type)
-}
 
 // 添加预览点位方法
 function previewPoints(points) {
@@ -369,8 +371,8 @@ function clearPreview() {
 }
 
 // 添加播放轨迹方法
-function playTrajectory(points, showTrajectory, configs) {
-  trajectoryManager.playTrajectory(points, showTrajectory, configs)
+function playTrajectory(points, trajectoryConfigs,playerMoveConfigs,showTrajectory) {
+  trajectoryManager.playTrajectory(points, trajectoryConfigs,playerMoveConfigs,showTrajectory)
 }
 
 // 添加清除方法
@@ -416,7 +418,6 @@ function stopCollectingPoints() {
 
 // 暴露方法供父组件使用
 defineExpose({
-  showTrajectory,
   previewPoints,
   clearPreview,
   playTrajectory,

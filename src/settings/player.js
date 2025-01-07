@@ -1,25 +1,33 @@
-// 球员配置
+// 球员基础配置
 export const PLAYER_CONFIG = {
-  male: {
-    height: 1.75,
-    shoulderWidth: 0.45,
-    colors: {
-      shirt: 0x2196F3,
-      shorts: 0x1976D2
-    }
+  // 基础尺寸
+  dimensions: {
+    height: 1,         // 球员高度(米)
+    shoulderWidth: 0.45,  // 肩宽(米)
+    radius: 0.3          // 碰撞半径(米)
   },
-  female: {
-    height: 1.65,
-    shoulderWidth: 0.4,
-    colors: {
-      shirt: 0xFF4081,
-      shorts: 0xE91E63
-    }
-  }
-}
 
-// 球员位置配置
-export const PLAYER_POSITIONS = {
-  frontCourt: { x: 0, y: 0, z: -3 },  // 前场位置
-  backCourt: { x: 0, y: 0, z: 3 }     // 后场位置
-} 
+  colors: {
+    shirt: 0x2196F3,
+    shorts: 0x1976D2
+  },
+
+  // 材质属性
+  materials: {
+    opacity: 0.8,
+    transparent: true,
+    shininess: 30
+  },
+  initialPositions: {
+    SINGLES: {
+        player1: { x: 0, z: -4 },
+        player2: { x: 0, z: 4 }
+    },
+    DOUBLES : {
+        player1: { x: 1.5, z: -4 },
+        player2: { x: 1.5, z: 4 },
+        player3: { x: -1.5, z: -4 },
+        player4: { x: -1.5, z: 4 }
+    }
+}
+}

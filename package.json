@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tweenjs/tween.js": "^25.0.0",
     "@vicons/ionicons5": "^0.12.0",
     "@vueuse/core": "^10.7.2",
     "naive-ui": "^2.40.3",

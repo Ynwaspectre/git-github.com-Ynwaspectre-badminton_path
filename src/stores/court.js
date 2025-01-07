@@ -3,7 +3,7 @@ import { useMessage } from 'naive-ui'
 
 export const useCourtStore = defineStore('court', {
     state: () => ({
-        selectedColor: '#4CAF50',
+        selectedColor: '#607D8B',
         courtColors: [
             { value: '#4CAF50', hex: '#4CAF50', name: '标准绿' },
             { value: '#2196F3', hex: '#2196F3', name: '标准蓝' },

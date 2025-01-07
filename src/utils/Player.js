@@ -18,21 +18,21 @@ export class Player {
   }
 
   createPlayerMesh() {
-    const config = PLAYER_CONFIG[this.gender]
+    const config = PLAYER_CONFIG
     const group = new THREE.Group()
 
     // 创建身体（圆柱体）
     const bodyGeometry = new THREE.CylinderGeometry(
-      config.shoulderWidth / 2,
-      config.shoulderWidth / 3,
-      config.height * 0.6,
+      config.dimensions.shoulderWidth / 2,
+      config.dimensions.shoulderWidth / 3,
+      config.dimensions.height*(8/9),
       32
     )
     const bodyMaterial = new THREE.MeshPhongMaterial({
       color: config.colors.shirt || 0x2196F3
     })
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
-    body.position.y = config.height * 0.3
+    body.position.y = config.dimensions.height * (0.3)
     group.add(body)
 
     // 创建数字贴图
@@ -60,8 +60,8 @@ export class Player {
 
     const numberTexture = new THREE.CanvasTexture(numberCanvas)
     const numberPlaneGeometry = new THREE.PlaneGeometry(
-      config.shoulderWidth * 0.8,
-      config.shoulderWidth * 0.8
+      config.dimensions.shoulderWidth * 0.8,
+      config.dimensions.shoulderWidth * 0.8
     )
     const numberPlaneMaterial = new THREE.MeshBasicMaterial({
       map: numberTexture,
@@ -73,59 +73,61 @@ export class Player {
 
     // 创建前面的数字
     const frontNumber = new THREE.Mesh(numberPlaneGeometry, numberPlaneMaterial)
-    frontNumber.position.set(0, config.height * 0.35, config.shoulderWidth / 2 + 0.01)
+    frontNumber.position.set(0, config.dimensions.height * 0.35, config.dimensions.shoulderWidth / 2 + 0.01)
     group.add(frontNumber)
 
     // 创建后面的数字（旋转180度）
     const backNumber = new THREE.Mesh(numberPlaneGeometry, numberPlaneMaterial.clone())
-    backNumber.position.set(0, config.height * 0.35, -(config.shoulderWidth / 2 + 0.01))
+    backNumber.position.set(0, config.dimensions.height * 0.35, -(config.dimensions.shoulderWidth / 2 + 0.01))
     backNumber.rotation.y = Math.PI
     group.add(backNumber)
 
-    // 创建腿部（圆柱体）
-    const legsGeometry = new THREE.CylinderGeometry(
-      config.shoulderWidth / 3,
-      config.shoulderWidth / 4,
-      config.height * 0.4,
-      8
-    )
-    const legsMaterial = new THREE.MeshPhongMaterial({
-      color: config.colors.shorts || 0x1976D2
-    })
-    const legs = new THREE.Mesh(legsGeometry, legsMaterial)
-    legs.position.y = config.height * 0.2
-    group.add(legs)
 
     // 创建头部（球体）
     const headGeometry = new THREE.SphereGeometry(
-      config.shoulderWidth / 3
+      config.dimensions.height*(1/9)
     )
     const headMaterial = new THREE.MeshPhongMaterial({
       color: 0xFFE0BD
     })
     const head = new THREE.Mesh(headGeometry, headMaterial)
-    head.position.y = config.height * 0.6 + config.shoulderWidth / 3
+    head.position.y = config.dimensions.height * (7.5/9)
     group.add(head)
 
     this.mesh = group
-    this.mesh.position.set(this.position.x, 0, this.position.z)
+    this.mesh.position.set(this.position.x, this.position.y, this.position.z)
     this.scene.add(this.mesh)
   }
 
   // 移动到指定位置
   moveTo(target, speed = 7) {
+    // 确保目标位置是有效的
+    if (!target || (typeof target.x === 'undefined' || typeof target.z === 'undefined')) {
+      console.warn('Invalid target position:', target)
+      return
+    }
+
     this.targetPosition = {
       x: target.x,
-      y: this.position.y,  // 保持y轴不变
+      y: 0,  // 确保y轴为0
       z: target.z
     }
     this.speed = speed
     this.isMoving = true
-    console.log(`球员${this.number}开始移动到(${target.x.toFixed(2)}, ${target.z.toFixed(2)})，速度: ${speed}`)
+    
+    // 计算移动距离，用于日志
+    const distance = Math.sqrt(
+      Math.pow(target.x - this.position.x, 2) + 
+      Math.pow(target.z - this.position.z, 2)
+    )
+    
   }
 
   // 更新位置
   update(deltaTime) {
+    // 添加调试日志
+
+
     if (!this.isMoving || !this.targetPosition) return
 
     // 计算当前位置到目标位置的向量
@@ -139,7 +141,6 @@ export class Player {
       this.position.z = this.targetPosition.z
       this.isMoving = false
       this.targetPosition = null
-      console.log(`球员${this.number}到达目标位置`)
       return
     }
 
@@ -148,7 +149,7 @@ export class Player {
     const directionZ = dz / distance
 
     // 计算这一帧要移动的距离
-    const moveDistance = this.speed * deltaTime
+    const moveDistance = Math.min(this.speed * deltaTime, distance)
 
     // 更新位置
     this.position.x += directionX * moveDistance
@@ -156,7 +157,7 @@ export class Player {
 
     // 更新网格位置
     if (this.mesh) {
-      this.mesh.position.set(this.position.x, this.position.y, this.position.z)
+      this.mesh.position.set(this.position.x, 0, this.position.z)  // 确保y轴为0
     }
   }
 
