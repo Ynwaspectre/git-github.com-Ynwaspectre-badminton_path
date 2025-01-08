@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 import * as TWEEN from '@tweenjs/tween.js'
 import { Player } from './Player'
+import { PLAYER_CONFIG } from '../settings/player'
 
-const FRAME_TIME = 1 / 60  // 60fps
-const FRAME_RATE = 60
+
 
 // 计算抛物线上的点
 function calculateParabolicPoint(start, end, t, arcHeight) {
@@ -54,24 +54,12 @@ export class TrajectoryManager {
     this.showTrajectory = true
 
     this.players = []
-    this.playerPositions = {
-      initialPositions: {
-        singles: {
-          player1: { x: 0, z: -4 },
-          player2: { x: 0, z: 4 }
-        },
-        doubles: {
-          player1: { x: 1.5, z: -4 },
-          player2: { x: 1.5, z: 4 },
-          player3: { x: -1.5, z: -4 },
-          player4: { x: -1.5, z: 4 }
-        }
-      },
-    }
+    this.playerPositions = PLAYER_CONFIG
     this.animating = false
     this.lastTime = null
     this.tweenGroup = new TWEEN.Group()
     this.isPlaying = false  // 添加播放状态标志
+    this.movePointCircles = []  // 存储光圈对象
   }
 
   initPlayers(type) {
@@ -82,7 +70,7 @@ export class TrajectoryManager {
       return
     }
     switch (type) {
-      case 'SINGLES':  // 单打
+      case 'singles':  // 单打
         this.players.push(
           new Player(this.scene, {
             position: {
@@ -103,7 +91,7 @@ export class TrajectoryManager {
         )
         break
 
-      case 'DOUBLES':  // 双打
+      case 'doubles':  // 双打
         this.players.push(
           new Player(this.scene, {
             position: {
@@ -322,8 +310,7 @@ export class TrajectoryManager {
   startAnimation(points, trajectoryConfigs, playerMoveConfigs) {
     let currentIndex = 0
     let firstHit = true
-    let ballStarted = false  // 添加标记，避免重复触发
-
+    let ballStarted = false
     // 有球员的动画场景
     const animateWithPlayers = () => {
       const start = points[currentIndex]
@@ -358,6 +345,52 @@ export class TrajectoryManager {
       } else {
         startBallAndNextPlayerMovement()
       }
+    }
+
+    // 添加无球员的动画场景
+    const animateWithoutPlayers = () => {
+      // 创建羽毛球并设置初始位置
+      this.createShuttlecock()
+      const firstPoint = points[0]
+      this.shuttlecock.position.set(firstPoint.x, firstPoint.y, firstPoint.z)
+
+      const moveToNextPoint = () => {
+        const start = points[currentIndex]
+        const end = points[currentIndex + 1]
+        const key = `P${currentIndex + 1}-P${currentIndex + 2}`
+        const trajectoryConfig = trajectoryConfigs[key]
+        const duration = (1000 * calculateDistance(start, end)) / trajectoryConfig.speed
+
+        new TWEEN.Tween({ t: 0 }, this.tweenGroup)
+          .to({ t: 1 }, duration)
+          .easing(TWEEN.Easing.Linear.None)
+          .onUpdate((obj) => {
+            const pos = calculateParabolicPoint(
+              start, end, obj.t, trajectoryConfig?.arcHeight || 0.15
+            )
+            this.shuttlecock.position.set(pos.x, pos.y, pos.z)
+            this.updateShuttlecockRotation(start, end, pos)
+            if (this.showTrajectory) {
+              this.updateTrajectoryLine(start, end, trajectoryConfig, obj.t)
+            }
+          })
+          .onComplete(() => {
+            currentIndex++
+            if (currentIndex < points.length - 1) {
+              moveToNextPoint()
+            } else {
+              // 动画完成，清理资源
+              this.cleanupAnimation()
+              if (this.onPlayComplete) {
+                this.onPlayComplete()
+              }
+            }
+          })
+          .start()
+      }
+
+      // 开始移动到第一个点
+      moveToNextPoint()
     }
 
     // 球的移动和下一个接球手的移动
@@ -455,7 +488,13 @@ export class TrajectoryManager {
       this.tweenGroup.update()
     }
 
-    animateWithPlayers()
+    // 根据是否有球员选择动画场景
+    if (this.players.length > 0) {
+      animateWithPlayers()
+    } else {
+      animateWithoutPlayers()
+    }
+    
     animate()
   }
 
@@ -497,6 +536,13 @@ export class TrajectoryManager {
     this.players = []
     this.initPlayers()
 
+    // 清理光圈
+    this.movePointCircles.forEach(circle => {
+      this.scene.remove(circle)
+      circle.geometry.dispose()
+      circle.material.dispose()
+    })
+    this.movePointCircles = []
   }
 
   dispose() {
@@ -770,4 +816,69 @@ export class TrajectoryManager {
     }
   }
 
+  // 添加创建光圈的方法
+  createMovePointCircle(position, radius = 0.3) {
+    const geometry = new THREE.RingGeometry(radius - 0.02, radius, 32)
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.5
+    })
+    const circle = new THREE.Mesh(geometry, material)
+    circle.rotation.x = -Math.PI / 2  // 使圆环平躺
+    circle.position.set(position.x, 0.01, position.z)  // 略微抬高以避免z-fighting
+    this.scene.add(circle)
+    return circle
+  }
+
+  // 更新移动点光圈
+  updateMovePointsLightCircle(moveConfigs) {
+    // 清除现有的光圈
+    this.movePointCircles.forEach(circle => {
+      this.scene.remove(circle)
+      circle.geometry.dispose()
+      circle.material.dispose()
+    })
+    this.movePointCircles = []
+
+    // 为每个配置创建新的光圈
+    Object.values(moveConfigs).forEach(config => {
+      // 击球点光圈
+      if (config.hitterStandPoint) {
+        const standCircle = this.createMovePointCircle({
+          x: config.hitterStandPoint.x,
+          z: config.hitterStandPoint.z
+        })
+        this.movePointCircles.push(standCircle)
+      }
+
+      // 回退点光圈
+      if (config.hitterReturnPoint) {
+        const returnCircle = this.createMovePointCircle({
+          x: config.hitterReturnPoint.x,
+          z: config.hitterReturnPoint.z
+        })
+        this.movePointCircles.push(returnCircle)
+      }
+
+      // 伙伴站位点光圈
+      if (config.partnerStandPoint) {
+        const partnerStandCircle = this.createMovePointCircle({
+          x: config.partnerStandPoint.x,
+          z: config.partnerStandPoint.z
+        })
+        this.movePointCircles.push(partnerStandCircle)
+      }
+
+      // 伙伴回退点光圈
+      if (config.partnerReturnPoint) {
+        const partnerReturnCircle = this.createMovePointCircle({
+          x: config.partnerReturnPoint.x,
+          z: config.partnerReturnPoint.z
+        })
+        this.movePointCircles.push(partnerReturnCircle)
+      }
+    })
+  }
 } 

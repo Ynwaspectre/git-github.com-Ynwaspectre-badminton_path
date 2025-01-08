@@ -19,11 +19,11 @@ export const PLAYER_CONFIG = {
     shininess: 30
   },
   initialPositions: {
-    SINGLES: {
-        player1: { x: 0, z: -4 },
-        player2: { x: 0, z: 4 }
+    singles: {
+        player1: { x: -1, z: -4 },
+        player2: { x: 1, z: 4 }
     },
-    DOUBLES : {
+    doubles : {
         player1: { x: 1.5, z: -4 },
         player2: { x: 1.5, z: 4 },
         player3: { x: -1.5, z: -4 },

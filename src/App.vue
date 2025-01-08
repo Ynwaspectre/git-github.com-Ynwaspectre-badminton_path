@@ -2,14 +2,14 @@
   <n-dialog-provider>
     <n-message-provider>
       <div class="h-screen flex">
-        <div class="w-1/2 h-full">
+        <div class="w-7/12 h-full">
           <Court 
             ref="courtRef"
             @pointSelected="handlePointSelected"
             @playComplete="handlePlayComplete"
           />
         </div>
-        <div class="w-1/2">
+        <div class="w-5/12">
           <CourtSettings 
             ref="settingsRef"
             @previewPoints="handlePreviewPoints"
