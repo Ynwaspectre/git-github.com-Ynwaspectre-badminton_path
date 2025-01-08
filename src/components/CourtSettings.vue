@@ -298,16 +298,22 @@
                                     P{{ index + 1 }}-P{{ index + 2 }}</div>
 
                                 <div class="flex items-center gap-2 ml-auto">
-                                    <div class="text-xs">击球球员:</div>
                                     <div class="flex gap-1">
-                                        <div v-for="player in playerMoveConfigs[`P${index + 1}-P${index + 2}`]?.players"
-                                            :key="player" class="cursor-pointer px-2 py-0.5 rounded text-xs" :class="{
-                                                'bg-green-500 text-black font-bold': playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter === player,
-                                                'bg-gray-200 hover:bg-gray-300': playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter !== player
-                                            }"
-                                            @click="playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter = player">
-                                            {{ player }}
-                                        </div>
+                                        <n-tooltip v-for="player in playerMoveConfigs[`P${index + 1}-P${index + 2}`]?.players"
+                                            :key="player"
+                                            trigger="hover"
+                                            placement="top">
+                                            <template #trigger>
+                                                <div class="cursor-pointer px-2 py-0.5 rounded text-xs" :class="{
+                                                    'bg-green-500 text-black font-bold': playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter === player,
+                                                    'bg-gray-200 hover:bg-gray-300': playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter !== player
+                                                }"
+                                                @click="playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter = player">
+                                                {{ player }}
+                                                </div>
+                                            </template>
+                                            点击选择 {{ player }}号球员 作为击球球员
+                                        </n-tooltip>
                                     </div>
                                 </div>
                             </div>
@@ -467,9 +473,8 @@ const emit = defineEmits([
     'stopCollectingPoints',
     'clearPreview',
     'matchTypeChange',
-    'playerMoveToPoint',
     'updatePlayerPositions',
-
+    'movePointsUpdate'
 ])
 
 
@@ -988,17 +993,80 @@ watch(
 
 
 
-watch(playerMoveConfigs, (newMoveConfigs) => {
-    console.log(newMoveConfigs, '新的击球和移动设置')
+// 创建一个计算属性，返回配置的字符串表示
+const playerMoveConfigsString = computed(() => 
+    JSON.stringify(playerMoveConfigs.value)
+)
 
-    //如果开启了光圈辅助，则更新光圈辅助的配置
-    if (showMovePoints.value) {
-        updateMovePointsLightCircle(newMoveConfigs)
+// 监听字符串的变化
+watch(
+    playerMoveConfigsString,
+    (newConfigString, oldConfigString) => {
+        // 将字符串解析回对象
+        const newConfigs = JSON.parse(newConfigString);
+        const oldConfigs = JSON.parse(oldConfigString);
+        
+        console.log('New configs:', newConfigs);
+        console.log('Old configs:', oldConfigs);
+
+        if (showMovePoints.value && oldConfigs) {
+            const changedPoints = findChangedPoints(newConfigs, oldConfigs);
+            console.log('Changed points:', changedPoints);
+            if (changedPoints) {
+                emit('movePointsUpdate', changedPoints);
+            }
+        }
     }
+);
 
+// 添加查找变化坐标的函数
+function findChangedPoints(newConfigs, oldConfigs) {
+    for (const key in newConfigs) {
+        console.log(key, 'key')
+        const newConfig = newConfigs[key]
+        const oldConfig = oldConfigs[key]
+        
+        // 检查击球点变化
+        if (hasPointChanged(newConfig.hitterStandPoint, oldConfig?.hitterStandPoint)) {
+            return {
+                from: oldConfig.hitterStandPoint,
+                to: newConfig.hitterStandPoint
+            }
+        }
+        
+        // 检查回退点变化
+        if (hasPointChanged(newConfig.hitterReturnPoint, oldConfig?.hitterReturnPoint)) {
+            return {
+                from: oldConfig.hitterReturnPoint,
+                to: newConfig.hitterReturnPoint
+            }
+        }
+        
+        // 检查伙伴站位点变化
+        if (hasPointChanged(newConfig.partnerStandPoint, oldConfig?.partnerStandPoint)) {
+            return {
+                from: oldConfig.partnerStandPoint,
+                to: newConfig.partnerStandPoint
+            }
+        }
+        
+        // 检查伙伴回退点变化
+        if (hasPointChanged(newConfig.partnerReturnPoint, oldConfig?.partnerReturnPoint)) {
+            return {
+                from: oldConfig.partnerReturnPoint,
+                to: newConfig.partnerReturnPoint
+            }
+        }
+    }
+    return null
+}
 
-}, { deep: true, immediate: true })
-
+// 辅助函数：检查点位是否发生变化
+function hasPointChanged(newPoint, oldPoint) {
+    if (!newPoint || !oldPoint) return false
+    console.log(newPoint, oldPoint, 'newPoint, oldPoint')
+    return newPoint.x !== oldPoint.x || newPoint.z !== oldPoint.z
+}
 
 //监听playerPositions 来更新球员的位置
 watch(playerPositions, (newPositions) => {
@@ -1053,6 +1121,15 @@ const railStyle = ({
     }
     return style;
 }
+
+// 监听 showMovePoints 的变化
+watch(showMovePoints, (newValue) => {
+    if (newValue) {
+        emit('movePointsUpdate', playerMoveConfigs.value)
+    } else {
+        emit('movePointsUpdate', {})  // 传空对象来清除光圈
+    }
+})
 
 // 暴给父件的方法
 defineExpose({

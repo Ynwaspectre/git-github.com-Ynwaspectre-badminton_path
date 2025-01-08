@@ -1,0 +1,16 @@
+// 标准绿色版本的 YONEX logo
+<svg width="800" height="400" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+    <text x="50%" y="50%" 
+          font-family="Arial Black, sans-serif" 
+          font-size="160" 
+          font-weight="bold" 
+          fill="#4CAF50" 
+          text-anchor="middle" 
+          dominant-baseline="middle">
+        YONEX
+    </text>
+    <path d="M 100 320 Q 400 240 700 320" 
+          stroke="#4CAF50" 
+          stroke-width="16" 
+          fill="none"/>
+</svg> 

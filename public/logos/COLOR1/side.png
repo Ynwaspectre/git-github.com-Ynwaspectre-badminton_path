@@ -1,0 +1,16 @@
+// 标准绿色版本的小 logo
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+    <text x="50%" y="50%" 
+          font-family="Arial Black, sans-serif" 
+          font-size="80" 
+          font-weight="bold" 
+          fill="#4CAF50" 
+          text-anchor="middle" 
+          dominant-baseline="middle">
+        YONEX
+    </text>
+    <path d="M 50 320 Q 200 240 350 320" 
+          stroke="#4CAF50" 
+          stroke-width="8" 
+          fill="none"/>
+</svg> 

@@ -9,6 +9,8 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { useCourtStore } from '../stores/court'
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader'
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry'
 
 import { 
   COURT_CONFIG, 
@@ -122,6 +124,7 @@ function initThreeJS() {
 
   createCourt()
   createLighting()
+  
 
   window.addEventListener('resize', onWindowResize)
 }
@@ -143,8 +146,29 @@ function createCourt() {
   courtPlane.receiveShadow = true
   scene.add(courtPlane)
 
+  // 添加外围边框
+  const paddingX = 0.5 // 左右边框与球场的间距（米）
+  const paddingZ = 1 // 前后边框与球场的间距（米）
+  const borderGeometry = new THREE.PlaneGeometry(
+    courtConfig.dimensions.width + paddingX * 2,
+    courtConfig.dimensions.length + paddingZ * 2
+  )
+  const borderMaterial = new THREE.MeshStandardMaterial({
+    color: courtConfig.colors.court, // 使用与球场相同的颜色
+    side: THREE.DoubleSide,
+    roughness: courtConfig.materials.courtRoughness,
+    metalness: courtConfig.materials.metalness,
+    flatShading: false
+  })
+  const borderPlane = new THREE.Mesh(borderGeometry, borderMaterial)
+  borderPlane.rotation.x = -Math.PI / 2
+  borderPlane.position.y = -0.001 // 略微降低，以避免z-fighting
+  borderPlane.receiveShadow = true
+  scene.add(borderPlane)
+
   createCourtLines()
   createNet()
+  createLogo()
 }
 
 // 创建场地线条
@@ -327,6 +351,52 @@ function createLighting() {
   scene.add(topLight)
 }
 
+
+function createLogo() {
+  scene.children = scene.children.filter(child => !child.isLogo)
+
+  const fontLoader = new FontLoader();
+  fontLoader.load('/fonts/helvetiker_bold.typeface.json', (font) => {
+    const textGeometry = new TextGeometry('YONEX', {
+      font: font,
+      size: 0.3,
+      height: 0.01,
+      curveSegments: 12,
+    });
+
+    textGeometry.computeBoundingBox();
+    const textMaterial = new THREE.MeshBasicMaterial({
+      color: 0xFFFFFF,
+      transparent: true,
+      opacity: 1
+    });
+
+    
+    const nearTextMesh = new THREE.Mesh(textGeometry.clone(), textMaterial.clone());
+    nearTextMesh.position.set(
+      -1.5,  // 与场地边线对齐
+      0.002,
+      -7.4    // 在外边框和场地线之间的中间
+    );
+    nearTextMesh.rotation.x = -Math.PI / 2;
+    nearTextMesh.rotation.z = Math.PI ;
+    nearTextMesh.isLogo = true;
+    scene.add(nearTextMesh);
+
+  
+    const farTextMesh = new THREE.Mesh(textGeometry.clone(), textMaterial.clone());
+    farTextMesh.position.set(
+      1.5,   // 与场地边线对齐
+      0.002,
+      7.4    // 在外边框和场地线之间的中间
+    );
+    farTextMesh.rotation.x = -Math.PI / 2;
+    farTextMesh.isLogo = true;
+    scene.add(farTextMesh);
+  });
+}
+
+
 function onWindowResize() {
   const container = courtContainer.value
   if (!container) return
@@ -350,9 +420,8 @@ function animate() {
 // 监听颜色变化
 watch(() => courtStore.selectedColor, (newColor) => {
   if (scene) {
-    // 更新球场材质颜色
     courtConfig.colors.court = newColor
-    // 重新创球场
+    // 重新创建球场（这将同时更新球场和边框的颜色）
     createCourt()
   }
 }, { immediate: true })
@@ -426,7 +495,8 @@ defineExpose({
   stopCollectingPoints,
   updateMatchType,
   movePlayerToPoint,
-  updatePlayerPositions
+  updatePlayerPositions,
+  updateMovePointsLightCircle
 })
 
 // 添加 updateMatchType 方法
@@ -448,5 +518,12 @@ function updatePlayerPositions(positions) {
   if (trajectoryManager) {
     trajectoryManager.updatePlayerPositions(positions)
   }
+}
+
+// 添加更新移动点光圈的方法
+function updateMovePointsLightCircle(moveConfigs) {
+    if (trajectoryManager) {
+        trajectoryManager.updateMovePointsLightCircle(moveConfigs)
+    }
 }
 </script>

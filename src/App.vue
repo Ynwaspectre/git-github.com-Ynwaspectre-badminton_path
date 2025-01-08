@@ -19,8 +19,8 @@
             @startCollectingPoints="handleStartCollectingPoints"
             @stopCollectingPoints="handleStopCollectingPoints"
             @matchTypeChange="handleMatchTypeChange"
-            @playerMoveToPoint="handlePlayerMoveToPoint"
             @updatePlayerPositions="handleUpdatePlayerPositions"
+            @movePointsUpdate="handleMovePointsUpdate"
           />
         </div>
       </div>
@@ -74,12 +74,13 @@ function handleMatchTypeChange(config) {
   courtRef.value?.updateMatchType(config)
 }
 
-function handlePlayerMoveToPoint(point) {
-  console.log('App: handlePlayerMoveToPoint called with point:', point)
-  courtRef.value?.movePlayerToPoint(point)
-}
+
 
 function handleUpdatePlayerPositions(positions) {
   courtRef.value?.updatePlayerPositions(positions)
+}
+
+function handleMovePointsUpdate(moveConfigs) {
+    courtRef.value?.updateMovePointsLightCircle(moveConfigs)
 }
 </script> 

@@ -59,7 +59,8 @@ export class TrajectoryManager {
     this.lastTime = null
     this.tweenGroup = new TWEEN.Group()
     this.isPlaying = false  // 添加播放状态标志
-    this.movePointCircles = []  // 存储光圈对象
+    this.debounceTimer = null;  // 添加防抖计时器
+
   }
 
   initPlayers(type) {
@@ -536,13 +537,7 @@ export class TrajectoryManager {
     this.players = []
     this.initPlayers()
 
-    // 清理光圈
-    this.movePointCircles.forEach(circle => {
-      this.scene.remove(circle)
-      circle.geometry.dispose()
-      circle.material.dispose()
-    })
-    this.movePointCircles = []
+
   }
 
   dispose() {
@@ -816,69 +811,102 @@ export class TrajectoryManager {
     }
   }
 
-  // 添加创建光圈的方法
-  createMovePointCircle(position, radius = 0.3) {
-    const geometry = new THREE.RingGeometry(radius - 0.02, radius, 32)
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.5
-    })
-    const circle = new THREE.Mesh(geometry, material)
-    circle.rotation.x = -Math.PI / 2  // 使圆环平躺
-    circle.position.set(position.x, 0.01, position.z)  // 略微抬高以避免z-fighting
-    this.scene.add(circle)
-    return circle
+
+
+  // 修改光圈动画方法
+  updateMovePointsLightCircle({ from, to }) {
+    // 添加防抖
+    if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+    }
+    
+    this.debounceTimer = setTimeout(() => {
+        this._createCrosshair(from, to);
+    }, 100);  // 100ms 的防抖延迟
   }
 
-  // 更新移动点光圈
-  updateMovePointsLightCircle(moveConfigs) {
-    // 清除现有的光圈
-    this.movePointCircles.forEach(circle => {
-      this.scene.remove(circle)
-      circle.geometry.dispose()
-      circle.material.dispose()
-    })
-    this.movePointCircles = []
+  _createCrosshair(from, to) {
+    if (!from || !to) return
 
-    // 为每个配置创建新的光圈
-    Object.values(moveConfigs).forEach(config => {
-      // 击球点光圈
-      if (config.hitterStandPoint) {
-        const standCircle = this.createMovePointCircle({
-          x: config.hitterStandPoint.x,
-          z: config.hitterStandPoint.z
+    // 创建瞄准镜组
+    const crosshairGroup = new THREE.Group()
+    
+    // 外圈 - 尺寸减半
+    const outerRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.2, 0.225, 32),  // 原来是 0.4, 0.45
+        new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
         })
-        this.movePointCircles.push(standCircle)
-      }
+    )
+    
+    // 内圈 - 尺寸减半
+    const innerRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.1, 0.125, 32),  // 原来是 0.2, 0.25
+        new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        })
+    )
+    
+    // 创建四个方向的小线段
+    const createLine = (x1, y1, x2, y2) => {
+        const points = [
+            new THREE.Vector3(x1, y1, 0),
+            new THREE.Vector3(x2, y2, 0)
+        ]
+        const geometry = new THREE.BufferGeometry().setFromPoints(points)
+        return new THREE.Line(
+            geometry,
+            new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.8, transparent: true })
+        )
+    }
+    
+    // 添加四个方向的线段 - 尺寸减半
+    const lineLength = 0.075  // 原来是 0.15
+    const lineDistance = 0.225 // 原来是 0.45，与外圈对齐
+    const lines = [
+        createLine(0, lineDistance, 0, lineDistance + lineLength),
+        createLine(0, -lineDistance, 0, -(lineDistance + lineLength)),
+        createLine(lineDistance, 0, lineDistance + lineLength, 0),
+        createLine(-lineDistance, 0, -(lineDistance + lineLength), 0)
+    ]
+    
+    // 将所有元素添加到组中
+    crosshairGroup.add(outerRing)
+    crosshairGroup.add(innerRing)
+    lines.forEach(line => crosshairGroup.add(line))
+    
+    // 设置组的位置和旋转
+    crosshairGroup.rotation.x = -Math.PI / 2
+    crosshairGroup.position.set(from.x, 0.05, from.z)
+    this.scene.add(crosshairGroup)
 
-      // 回退点光圈
-      if (config.hitterReturnPoint) {
-        const returnCircle = this.createMovePointCircle({
-          x: config.hitterReturnPoint.x,
-          z: config.hitterReturnPoint.z
+    // 创建动画
+    new TWEEN.Tween(crosshairGroup.position, this.tweenGroup)
+        .to({ x: to.x, z: to.z }, 200)
+        .easing(TWEEN.Easing.Quadratic.Out)
+        .onComplete(() => {
+            this.scene.remove(crosshairGroup)
+            // 清理资源
+            crosshairGroup.children.forEach(child => {
+                if (child.geometry) child.geometry.dispose()
+                if (child.material) child.material.dispose()
+            })
         })
-        this.movePointCircles.push(returnCircle)
-      }
+        .start()
 
-      // 伙伴站位点光圈
-      if (config.partnerStandPoint) {
-        const partnerStandCircle = this.createMovePointCircle({
-          x: config.partnerStandPoint.x,
-          z: config.partnerStandPoint.z
-        })
-        this.movePointCircles.push(partnerStandCircle)
-      }
-
-      // 伙伴回退点光圈
-      if (config.partnerReturnPoint) {
-        const partnerReturnCircle = this.createMovePointCircle({
-          x: config.partnerReturnPoint.x,
-          z: config.partnerReturnPoint.z
-        })
-        this.movePointCircles.push(partnerReturnCircle)
-      }
-    })
+    // 确保动画循环在运行
+    if (!this.animationFrameId) {
+        const animate = () => {
+            this.animationFrameId = requestAnimationFrame(animate)
+            this.tweenGroup.update()
+        }
+        animate()
+    }
   }
 } 
