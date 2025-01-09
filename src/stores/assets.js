@@ -19,15 +19,15 @@ export const useAssetsStore = defineStore('assets', {
         loadedAnimations: [], // 存储已加载的动画名称
         
         charactersList: [
-            {name: 'c1', path: '/static/models/characters/c1.fbx' },
-            {name: 'c2', path: '/static/models/characters/c2.fbx' },
-            {name: 'c3', path: '/static/models/characters/c3.fbx' },
-            {name: 'c4', path: '/static/models/characters/c4.fbx' },
+            {name: 'c1', path: '/models/characters/c1.fbx' },
+            {name: 'c2', path: '/models/characters/c2.fbx' },
+            {name: 'c3', path: '/models/characters/c3.fbx' },
+            {name: 'c4', path: '/models/characters/c4.fbx' },
         ],
         animationsList: [
-            { name: 'idle', path: '/static/models/animations/idle.fbx' },
-            { name: 'back', path: '/static/models/animations/back.fbx' },
-            { name: 'run', path: '/static/models/animations/run.fbx' }
+            { name: 'idle', path: '/models/animations/idle.fbx' },
+            { name: 'back', path: '/models/animations/back.fbx' },
+            { name: 'run', path: '/models/animations/run.fbx' }
         ]
     }),
 
