@@ -1,48 +1,54 @@
 import { defineStore } from 'pinia'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 
+// 创建一个非响应式的缓存对象
+const modelCache = {
+    characters: {},
+    animations: {}
+}
+
 export const useAssetsStore = defineStore('assets', {
     state: () => ({
-        // 加载状态
+        // 只存储加载状态
         loading: true,
         progress: 0,
         error: null,
         
-        // 存储加载的资源
-        characters: {},  // 角色模型
-        animations: {},  // 动画
+        // 存储资源的引用名称而不是实际模型
+        loadedCharacters: [], // 存储已加载的角色名称
+        loadedAnimations: [], // 存储已加载的动画名称
         
-        // 资源列表
         charactersList: [
-            { id:'c1', name: 'amy', path: '/static/characters/c1.fbx' },
-            { id:'c2', name: 'john', path: '/static/characters/c2.fbx' }
+            {name: 'c1', path: '/static/models/characters/c1.fbx' },
+            {name: 'c2', path: '/static/models/characters/c2.fbx' },
+            {name: 'c3', path: '/static/models/characters/c3.fbx' },
+            {name: 'c4', path: '/static/models/characters/c4.fbx' },
         ],
         animationsList: [
-            { name: 'idle', path: '/static/animations/idle.fbx' },
-            { name: 'back', path: '/static/animations/back.fbx' },
-            { name: 'forward', path: '/static/animations/forward.fbx' }
-            // 添加其他动画...
+            { name: 'idle', path: '/static/models/animations/idle.fbx' },
+            { name: 'back', path: '/static/models/animations/back.fbx' },
+            { name: 'run', path: '/static/models/animations/run.fbx' }
         ]
     }),
 
     actions: {
         async loadAssets() {
             this.loading = true
-            this.progress = 0
             this.error = null
-            
             const loader = new FBXLoader()
-            const totalAssets = this.charactersList.length + this.animationsList.length
-            let loadedAssets = 0
 
             try {
                 // 加载角色模型
                 for (const character of this.charactersList) {
                     try {
-                        const fbx = await loader.loadAsync(character.path)
-                        this.characters[character.name] = fbx
-                        loadedAssets++
-                        this.progress = (loadedAssets / totalAssets) * 100
+                        const fbx = await loader.loadAsync(
+                            character.path,
+                            () => {
+                            }
+                        )
+                        // 存储到非响应式缓存中
+                        modelCache.characters[character.name] = fbx
+                        this.loadedCharacters.push(character.name)
                         console.log(`Loaded character: ${character.name}`)
                     } catch (err) {
                         console.error(`Error loading character ${character.name}:`, err)
@@ -53,22 +59,24 @@ export const useAssetsStore = defineStore('assets', {
                 // 加载动画
                 for (const anim of this.animationsList) {
                     try {
-                        const fbx = await loader.loadAsync(anim.path)
+                        const fbx = await loader.loadAsync(
+                            anim.path,
+                            () => {
+                              
+                            }
+                        )
                         if (fbx.animations && fbx.animations.length > 0) {
-                            this.animations[anim.name] = fbx.animations[0]
+                            // 存储到非响应式缓存中
+                            modelCache.animations[anim.name] = fbx.animations[0]
+                            this.loadedAnimations.push(anim.name)
                             console.log(`Loaded animation: ${anim.name}`)
-                        } else {
-                            console.warn(`No animations found in file: ${anim.path}`)
                         }
-                        loadedAssets++
-                        this.progress = (loadedAssets / totalAssets) * 100
                     } catch (err) {
                         console.error(`Error loading animation ${anim.name}:`, err)
                         this.error = `Failed to load animation: ${anim.name}`
                     }
                 }
 
-                console.log('All assets loaded successfully')
                 this.loading = false
             } catch (err) {
                 console.error('Asset loading failed:', err)
@@ -79,12 +87,12 @@ export const useAssetsStore = defineStore('assets', {
 
         // 获取角色模型
         getCharacter(name) {
-            return this.characters[name]
+            return modelCache.characters[name]
         },
 
         // 获取动画
         getAnimation(name) {
-            return this.animations[name]
+            return modelCache.animations[name]
         }
     }
 }) 

@@ -2,9 +2,7 @@
     <div v-if="assetsStore.loading" class="loading-screen">
         <div class="loading-content">
             <div class="loading-spinner"></div>
-            <div class="loading-progress">
-                {{ Math.round(assetsStore.progress) }}%
-            </div>
+            <div class="loading-text">资源加载中...</div>
             <div v-if="assetsStore.error" class="loading-error">
                 {{ assetsStore.error }}
             </div>
@@ -25,7 +23,7 @@ const assetsStore = useAssetsStore()
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: #1a1a1a;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -35,26 +33,44 @@ const assetsStore = useAssetsStore()
 .loading-content {
     text-align: center;
     color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #3498db;
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top: 4px solid #4CAF50;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 20px;
+    animation: spin 0.8s ease-in-out infinite;
+    margin: 0 auto 24px;
 }
 
 .loading-progress {
-    font-size: 24px;
-    margin-bottom: 10px;
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .loading-error {
-    color: #ff4444;
-    margin-top: 10px;
+    color: #ff6b6b;
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: rgba(255, 107, 107, 0.1);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.loading-text {
+    font-size: 18px;
+    color: #ffffff;
+    margin-bottom: 8px;
+    opacity: 0.9;
 }
 
 @keyframes spin {

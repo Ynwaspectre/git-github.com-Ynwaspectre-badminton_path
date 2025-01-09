@@ -35,6 +35,7 @@ let controls
 let trajectoryManager
 
 
+
 // 添加轨迹相关的状态
 const trajectoryLine = ref(null)
 const shuttlecock = ref(null)
@@ -49,6 +50,7 @@ let courtPlane  // 存储场地平面引用
 onMounted(() => {
   initThreeJS()
   animate()
+
   trajectoryManager = new TrajectoryManager(
     scene,
     () => {
@@ -57,6 +59,8 @@ onMounted(() => {
     }
   )
 })
+
+
 
 // 卸载时清理
 onUnmounted(() => {
@@ -413,6 +417,7 @@ function onWindowResize() {
 // 渲染循环
 function animate() {
   requestAnimationFrame(animate)
+  
   controls.update()
   renderer.render(scene, camera)
 }
