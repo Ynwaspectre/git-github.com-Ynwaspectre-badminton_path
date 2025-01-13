@@ -649,6 +649,7 @@ function playTrajectory() {
             showTrajectory: showTrajectory.value
         })
     } catch (error) {
+        console.log(error)
         dialog.warning({
             title: '轨迹弧度不足',
             content: error.message,

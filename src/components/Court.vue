@@ -49,8 +49,6 @@ let courtPlane  // 存储场地平面引用
 // 初始化 Three.js 场景
 onMounted(() => {
   initThreeJS()
-  animate()
-
   trajectoryManager = new TrajectoryManager(
     scene,
     () => {
@@ -58,6 +56,7 @@ onMounted(() => {
       emit('playComplete')
     }
   )
+  animate()
 })
 
 
@@ -416,10 +415,10 @@ function onWindowResize() {
 
 // 渲染循环
 function animate() {
-  requestAnimationFrame(animate)
-  
   controls.update()
   renderer.render(scene, camera)
+
+  requestAnimationFrame(animate)
 }
 
 // 监听颜色变化
@@ -450,8 +449,8 @@ function playTrajectory(points, trajectoryConfigs,playerMoveConfigs,showTrajecto
 }
 
 // 添加清除方法
-function clearPoints() {
-  trajectoryManager.cleanup()
+function clearMarkers() {
+  trajectoryManager.clearMarkers()
 }
 
 // 添加鼠标点击事件处理
@@ -495,7 +494,7 @@ defineExpose({
   previewPoints,
   clearPreview,
   playTrajectory,
-  clearPoints,
+  clearMarkers,
   startCollectingPoints,
   stopCollectingPoints,
   updateMatchType,

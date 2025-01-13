@@ -1,6 +1,5 @@
 <template>
-  <LoadingScreen v-if="assetsStore.loading" />
-  <div v-else>
+  <div >
     <n-dialog-provider>
       <n-message-provider>
         <div class="h-screen flex">
@@ -25,15 +24,7 @@ import { ref, onMounted } from 'vue'
 import Court from './components/Court.vue'
 import CourtSettings from './components/CourtSettings.vue'
 import { NDialogProvider, NMessageProvider } from 'naive-ui'
-import { useAssetsStore } from './stores/assets'
-import LoadingScreen from './components/LoadingScreen.vue'
 
-const assetsStore = useAssetsStore()
-console.log('加载角色资源')
-onMounted(async () => {
-  console.log('加载动画资源')
-  await assetsStore.loadAssets()
-})
 
 const courtRef = ref(null)
 const settingsRef = ref(null)
@@ -47,7 +38,7 @@ function handlePlayTrajectory({ points, trajectoryConfigs, playerMoveConfigs, sh
 }
 
 function handleClearPoints() {
-  courtRef.value?.clearPoints()
+  courtRef.value?.clearMarkers()
 }
 
 function handlePointSelected(point) {

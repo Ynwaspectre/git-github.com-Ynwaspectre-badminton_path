@@ -97,20 +97,10 @@ export class TrajectoryManager {
         this.players.push(player)
       }
     }
-
-    const animate = () => {
-      requestAnimationFrame(animate)
-      this.players.forEach(player => {
-        player.update()
-      })
-    }
-    animate()
   }
 
   updateMatchType(config) {
-    console.time('initPlayers')
     this.initPlayers(config.type)
-    console.timeEnd('initPlayers')
   }
 
 
@@ -256,52 +246,171 @@ export class TrajectoryManager {
 
   startAnimation(points, trajectoryConfigs, playerMoveConfigs) {
     let currentIndex = 0
-    let firstHit = true
-    let ballStarted = false
-    // 有球员的动画场景
+
     const animateWithPlayers = () => {
-      const start = points[currentIndex]
-      const key = `P${currentIndex + 1}-P${currentIndex + 2}`
-      const moveConfig = playerMoveConfigs[key]
+      // 执行第一段动作（初始化）
+      const executeInitialMovement = () => {
+        const start = points[0]
+        const firstKey = 'P1-P2'
+        const firstMoveConfig = playerMoveConfigs[firstKey]
+        const firstHitter = this.players[firstMoveConfig.hitter - 1]
+        const firstPartner = this.players.find(player =>
+          player.number !== firstMoveConfig.hitter &&
+          Math.sign(player.position.z) === Math.sign(start.z)
+        )
 
-      if (firstHit) {
-        const hitter = this.players[moveConfig.hitter - 1]
+        const firstDuration = 1000
 
-        if (hitter) {
-          new TWEEN.Tween(hitter.position, this.tweenGroup)
-            .to({ x: start.x, z: start.z }, 1000)
-            .easing(TWEEN.Easing.Quadratic.InOut)
-            .onUpdate(() => {
-              hitter.mesh.position.copy(hitter.position)
-              // 计算朝向目标点的角度
-              const angle = Math.atan2(start.x - hitter.mesh.position.x, start.z - hitter.mesh.position.z)
-              hitter.mesh.rotation.y = angle
-              hitter.playAnimation('run')
-            })
-            .onComplete(() => {
-              if (!ballStarted) {  // 只在第一次触发
-                ballStarted = true
-                console.log('第一个击球手到达击球点')
-                // 创建羽毛球并设置初始位置
-                this.createShuttlecock()
-                this.shuttlecock.position.set(start.x, start.y, start.z)
+        // 击球手移动到击球点
+        new TWEEN.Tween(firstHitter.position, this.tweenGroup)
+          .to({ x: start.x, z: start.z }, firstDuration)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .onUpdate(() => {
+            firstHitter.mesh.position.copy(firstHitter.position)
+          })
+          .onComplete(() => {
+            this.createShuttlecock()
+            this.shuttlecock.position.set(start.x, start.y, start.z)
+            startMainLoop(0) // 开始主循环，从第二个点开始
+          })
+          .start()
 
-                // 计算下一个点的方向  面向那个点
-                const nextPoint = points[currentIndex + 1]
-                const angle = Math.atan2(nextPoint.x - hitter.mesh.position.x, nextPoint.z - hitter.mesh.position.z)
-                hitter.mesh.rotation.y = angle
-                hitter.playAnimation('idle')
-
-                // 立即开始球的移动
-                firstHit = false
-                startBallAndNextPlayerMovement()
-              }
-            })
+        if (firstPartner) {
+        // 搭档移动到站立点
+        new TWEEN.Tween(firstPartner.position, this.tweenGroup)
+          .to({ 
+            x: firstMoveConfig.partnerStandPoint.x, 
+            z: firstMoveConfig.partnerStandPoint.z 
+          }, firstDuration)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .onUpdate(() => {
+            firstPartner.mesh.position.copy(firstPartner.position)
+          })
             .start()
         }
-      } else {
-        startBallAndNextPlayerMovement()
       }
+
+      // 主循环动画
+      const startMainLoop = (startIndex) => {
+        let currentIndex = startIndex
+        console.log('开始主循环',currentIndex)
+        const executeLoopMovement = () => {
+          const start = points[currentIndex]
+          const end = points[currentIndex + 1]
+          const key = `P${currentIndex + 1}-P${currentIndex + 2}`
+          const moveConfig = playerMoveConfigs[key]
+          const trajectoryConfig = trajectoryConfigs[key]
+          const duration = 1000 * calculateDistance(start, end) / trajectoryConfig.speed
+
+          // 当前击球手和搭档
+          const currentHitter = this.players[moveConfig.hitter - 1]
+          const currentPartner = this.players.find(player =>
+            player.number !== moveConfig.hitter &&
+            Math.sign(player.position.z) === Math.sign(start.z)
+          )
+
+          // 下一个击球手和搭档
+          const nextKey = `P${currentIndex + 2}-P${currentIndex + 3}`
+          const nextMoveConfig = playerMoveConfigs[nextKey]
+          const nextHitter = this.players[nextMoveConfig?.hitter - 1]
+          const nextPartner = nextHitter ? this.players.find(player =>
+            player.number !== nextMoveConfig.hitter &&
+            Math.sign(player.position.z) === Math.sign(nextHitter.position.z)
+          ) : null
+
+          const animations = []
+
+
+          const createShuttlecockAnimation = (start, end, trajectoryConfig, duration) => {
+            return new TWEEN.Tween({ t: 0 }, this.tweenGroup)
+              .to({ t: 1 }, duration)
+              .easing(TWEEN.Easing.Linear.None)
+              .onUpdate((obj) => {
+                const pos = calculateParabolicPoint(
+                  start, end, obj.t, trajectoryConfig?.arcHeight
+                )
+                this.shuttlecock.position.set(pos.x, pos.y, pos.z)
+                this.updateShuttlecockRotation(start, end, pos)
+                if (this.showTrajectory) {
+                  this.updateTrajectoryLine(start, end, trajectoryConfig, obj.t)
+                }
+              })
+              .onComplete(() => {
+                currentIndex++
+                if (currentIndex < points.length - 1) {
+                  startMainLoop(currentIndex)
+                }
+                else {
+                  console.log('动画完成')
+                  this.cleanupBadmintonResources()
+                  this.returnPlayersToInitialPositions()
+                }
+              })
+          }
+        
+          const createNextHitterAnimation = (nextHitter, end, duration) => {
+            return new TWEEN.Tween(nextHitter.position, this.tweenGroup)
+              .to({ x: end.x, z: end.z }, duration)
+              .easing(TWEEN.Easing.Quadratic.InOut)
+              .onUpdate(() => {
+                nextHitter.mesh.position.copy(nextHitter.position)
+              })
+          }
+        
+          const createNextPartnerAnimation = (nextPartner, nextMoveConfig, duration) => {
+            return new TWEEN.Tween(nextPartner.position, this.tweenGroup)
+              .to({ 
+                x: nextMoveConfig.partnerStandPoint.x, 
+                z: nextMoveConfig.partnerStandPoint.z 
+              }, duration)
+              .easing(TWEEN.Easing.Quadratic.InOut)
+              .onUpdate(() => {
+                nextPartner.mesh.position.copy(nextPartner.position)
+              })
+          }
+        
+          const createCurrentHitterReturnAnimation = (currentHitter, moveConfig, duration) => {
+            return new TWEEN.Tween(currentHitter.position, this.tweenGroup)
+              .to({ 
+                x: moveConfig.hitterReturnPoint.x, 
+                z: moveConfig.hitterReturnPoint.z 
+              }, duration)
+              .easing(TWEEN.Easing.Quadratic.InOut)
+              .onUpdate(() => {
+                currentHitter.mesh.position.copy(currentHitter.position)
+              })
+          }
+        
+          const createCurrentPartnerReturnAnimation = (currentPartner, moveConfig, duration) => {
+            return new TWEEN.Tween(currentPartner.position, this.tweenGroup)
+              .to({ 
+                x: moveConfig.partnerReturnPoint.x, 
+                z: moveConfig.partnerReturnPoint.z 
+              }, duration)
+              .easing(TWEEN.Easing.Quadratic.InOut)
+              .onUpdate(() => {
+                currentPartner.mesh.position.copy(currentPartner.position)
+              })
+          }
+
+          // 添加羽毛球动画
+          animations.push(createShuttlecockAnimation(start, end, trajectoryConfig, duration))
+
+          // 添加球员动画
+          if (nextHitter) animations.push(createNextHitterAnimation(nextHitter, end, duration))
+          if (nextPartner) animations.push(createNextPartnerAnimation(nextPartner, nextMoveConfig, duration))
+          if (currentHitter) animations.push(createCurrentHitterReturnAnimation(currentHitter, moveConfig, duration))
+          if (currentPartner) animations.push(createCurrentPartnerReturnAnimation(currentPartner, moveConfig, duration))
+
+          // 启动所有动画
+          animations.forEach(animation => animation.start())
+        }
+
+        executeLoopMovement()
+      }
+
+      // 开始执行初始动作
+      executeInitialMovement()
     }
 
     // 添加无球员的动画场景
@@ -337,7 +446,11 @@ export class TrajectoryManager {
               moveToNextPoint()
             } else {
               // 动画完成，清理资源
-              this.cleanupAnimation()
+              this.cleanupBadmintonResources()
+              if (this.animationFrameId) {
+                cancelAnimationFrame(this.animationFrameId)
+                this.animationFrameId = null
+              }
               if (this.onPlayComplete) {
                 this.onPlayComplete()
               }
@@ -348,136 +461,6 @@ export class TrajectoryManager {
 
       // 开始移动到第一个点
       moveToNextPoint()
-    }
-
-    // 球的移动和下一个接球手的移动
-    const startBallAndNextPlayerMovement = () => {
-      const start = points[currentIndex]
-      const end = points[currentIndex + 1]
-      const key = `P${currentIndex + 1}-P${currentIndex + 2}`
-      const moveConfig = playerMoveConfigs[key]
-      const trajectoryConfig = trajectoryConfigs[key]
-      const duration = (1000 * calculateDistance(start, end)) / trajectoryConfig.speed
-
-      // 获取当前击球手和他的队友
-      const currentHitter = this.players[moveConfig.hitter - 1]
-      const currentPartners = this.players.filter(p =>
-        p.number !== moveConfig.hitter &&
-        Math.sign(p.position.z) === Math.sign(start.z)
-      )
-
-      // 获取下一个接球手和他的队友
-      const nextKey = `P${currentIndex + 2}-P${currentIndex + 3}`
-      const nextMoveConfig = playerMoveConfigs[nextKey]
-      const nextHitter = currentIndex + 1 < points.length - 1 ?
-        this.players[nextMoveConfig.hitter - 1] : null
-
-      // 开始球的移动
-      new TWEEN.Tween({ t: 0 }, this.tweenGroup)
-        .to({ t: 1 }, duration)
-        .easing(TWEEN.Easing.Linear.None)
-        .onUpdate((obj) => {
-          const pos = calculateParabolicPoint(
-            start, end, obj.t, trajectoryConfig?.arcHeight || 0.15
-          )
-          this.shuttlecock.position.set(pos.x, pos.y, pos.z)
-          this.updateShuttlecockRotation(start, end, pos)
-          if (this.showTrajectory) {
-            this.updateTrajectoryLine(start, end, trajectoryConfig, obj.t)
-          }
-        })
-        .onComplete(() => {
-          currentIndex++
-          if (currentIndex < points.length - 1) {
-            animateWithPlayers()
-          } else {
-            // 球到达最后一个点时，先清理球和轨迹
-            this.cleanupAnimation()
-            // 然后开始球员回位
-            this.returnPlayersToInitialPositions()
-          }
-        })
-        .start()
-
-      // 同时开始下一个接球手的移动，速度根据球的飞行时间计算
-      if (nextHitter) {
-        new TWEEN.Tween(nextHitter.position, this.tweenGroup)
-          .to({ x: end.x, z: end.z }, duration)  // 使用球的飞行时间
-          .easing(TWEEN.Easing.Quadratic.InOut)
-          .onUpdate(() => {
-            nextHitter.mesh.position.copy(nextHitter.position)
-            // 计算朝向目标点的角度
-            const angle = Math.atan2(end.x - nextHitter.mesh.position.x, end.z - nextHitter.mesh.position.z)
-            nextHitter.mesh.rotation.y = angle
-            nextHitter.playAnimation('run')
-          })
-          .onComplete(() => {
-            // 调整头的方向为下一个击球点的方向
-            const angle = Math.atan2(end.x - nextHitter.mesh.position.x, end.z - nextHitter.mesh.position.z)
-            nextHitter.mesh.rotation.y = angle
-            nextHitter.playAnimation('idle')
-          })
-          .start()
-      }
-
-      // 当前击球手和队友回退
-      if (currentHitter) {
-        new TWEEN.Tween(currentHitter.position, this.tweenGroup)
-          .to({
-            x: moveConfig.hitterReturnPoint.x,
-            z: moveConfig.hitterReturnPoint.z
-          }, duration)
-          .easing(TWEEN.Easing.Quadratic.InOut)
-          .onUpdate(() => {
-            currentHitter.mesh.position.copy(currentHitter.position)
-            // 计算朝向目标点的角度
-            // 判断回退点是否在当前位置后面
-            // 根据球员在哪个半场来判断前后移动
-            const isUpperCourt = currentHitter.mesh.position.z > 0
-            const isMovingBackward = isUpperCourt ?
-              moveConfig.hitterReturnPoint.z > currentHitter.mesh.position.z :
-              moveConfig.hitterReturnPoint.z < currentHitter.mesh.position.z
-            const angle = Math.atan2(moveConfig.hitterReturnPoint.x - currentHitter.mesh.position.x, moveConfig.hitterReturnPoint.z - currentHitter.mesh.position.z)
-            currentHitter.mesh.rotation.y = isMovingBackward ? angle + Math.PI : angle
-            currentHitter.playAnimation(isMovingBackward ? 'back' : 'run')
-          })
-          .onComplete(() => {
-            // 调整头的方向为面向对面球场
-            const angle = Math.atan2(moveConfig.hitterReturnPoint.x - currentHitter.mesh.position.x, moveConfig.hitterReturnPoint.z - currentHitter.mesh.position.z)
-            currentHitter.mesh.rotation.y = angle + Math.PI
-            currentHitter.playAnimation('idle')
-          })
-          .start()
-      }
-
-      // 队友移动到站位点，使用配置的速度
-      currentPartners.forEach(partner => {
-        new TWEEN.Tween(partner.position, this.tweenGroup)
-          .to({
-            x: moveConfig.partnerStandPoint.x,
-            z: moveConfig.partnerStandPoint.z
-          }, duration)
-          .easing(TWEEN.Easing.Quadratic.InOut)
-          .onUpdate(() => {
-            partner.mesh.position.copy(partner.position)
-            // 计算朝向目标点的角度
-            // 判断站位点是否在当前位置后面
-            const isUpperCourt = partner.mesh.position.z > 0
-            const isMovingBackward = isUpperCourt ?
-              moveConfig.partnerStandPoint.z > partner.mesh.position.z :
-              moveConfig.partnerStandPoint.z < partner.mesh.position.z
-            const angle = Math.atan2(moveConfig.partnerStandPoint.x - partner.mesh.position.x, moveConfig.partnerStandPoint.z - partner.mesh.position.z)
-            partner.mesh.rotation.y = isMovingBackward ? angle + Math.PI : angle
-            partner.playAnimation(isMovingBackward ? 'back' : 'run')
-          })
-          .onComplete(() => {
-            // 调整头的方向为面向对面球场
-            const angle = Math.atan2(moveConfig.partnerStandPoint.x - partner.mesh.position.x, moveConfig.partnerStandPoint.z - partner.mesh.position.z)
-            partner.mesh.rotation.y = angle + Math.PI
-            partner.playAnimation('idle')
-          })
-          .start()
-      })
     }
 
     // 开始动画循环
@@ -499,6 +482,8 @@ export class TrajectoryManager {
   easeInOutQuad(t) {
     return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
   }
+
+
 
   cleanup(keepMarkers = false) {
     if (this.animationFrameId) {
@@ -531,7 +516,6 @@ export class TrajectoryManager {
     this.currentTrajectoryPoints = []
 
     this.initPlayers()
-
 
   }
 
@@ -621,33 +605,60 @@ export class TrajectoryManager {
     }
   }
 
-  // 添加更新球员初始位置配置的方法
   updatePlayerPositions(positions) {
     console.log('初始位置更新', positions)
+
+    // 创建独立的 TWEEN Group 用于位置更新
+    const positionTweenGroup = new TWEEN.Group()
+    let positionAnimationFrameId = null
+    let completedCount = 0
+    const totalPlayers = this.players.length
+
     // 更新所有球员位置
     this.players.forEach((player, index) => {
       const playerNum = index + 1
       const position = positions[`player${playerNum}`]
       if (position) {
-        new TWEEN.Tween(player.position)
+        new TWEEN.Tween(player.position, positionTweenGroup)
           .to({
             x: position.x,
             y: 0,
             z: position.z
-          }, 1)
+          }, 100)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .onUpdate(() => {
+            // 同步更新 mesh 位置
+            player.mesh.position.copy(player.position)
+          })
+          .onComplete(() => {
+            completedCount++
+          })
           .start()
+      } else {
+        completedCount++
       }
     })
+
+    // 创建动画循环
+    const animate = () => {
+      if (completedCount < totalPlayers) {
+        positionAnimationFrameId = requestAnimationFrame(animate)
+        positionTweenGroup.update()
+      } else {
+        // 动画完成后清理
+        cancelAnimationFrame(positionAnimationFrameId)
+        positionAnimationFrameId = null
+      }
+    }
+
+    // 开始动画循环
+    animate()
   }
 
   // 添加一个清理动画资源的方法
-  cleanupAnimation() {
+  cleanupBadmintonResources() {
+    console.log('清理羽毛球资源')
     // 取消所有动画帧
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId)
-      this.animationFrameId = null
-    }
-
     // 清理轨迹线
     if (this.trajectoryLine) {
       this.scene.remove(this.trajectoryLine)
@@ -715,7 +726,6 @@ export class TrajectoryManager {
 
   returnPlayersToInitialPositions() {
     console.log('开始让球员回到初始位置')
-
     if (this.players.length > 0) {
       const isDoubles = this.players.length > 2
       const initialPositions = isDoubles ?
@@ -725,30 +735,27 @@ export class TrajectoryManager {
       let completedCount = 0
       const totalPlayersCount = this.players.length
 
-      // 为返回动画创建独立的 TWEEN Group
-      const returnTweenGroup = new TWEEN.Group()
-      // 使用独立的动画帧 ID
-      let returnAnimationFrameId = null
       // 让所有球员同时开始移动
       this.players.forEach((player) => {
         if (player && player.mesh && player.position) {
           const playerNum = player.number
           const initialPos = initialPositions[`player${playerNum}`]
           if (initialPos) {
-            new TWEEN.Tween(player.position, returnTweenGroup)  // 使用独立的 TWEEN Group
+            new TWEEN.Tween(player.position, this.tweenGroup)
               .to({
                 x: initialPos.x,
+                y: 0,
                 z: initialPos.z
               }, 2000)
               .easing(TWEEN.Easing.Quadratic.InOut)
               .onUpdate(() => {
-                // 根据球员所在半场决定朝向
-                const isUpperCourt = player.mesh.position.z > 0
-                player.mesh.rotation.y = isUpperCourt ? Math.PI : 0
-                player.playAnimation('idle')
+                player.mesh.position.copy(player.position)
               })
               .onComplete(() => {
                 completedCount++
+                if (completedCount === totalPlayersCount && this.onPlayComplete) {
+                  this.onPlayComplete()
+                }
               })
               .start()
           } else {
@@ -758,26 +765,8 @@ export class TrajectoryManager {
           completedCount++
         }
       })
-      // 创建独立的动画循环
-      const animate = () => {
-        if (completedCount < totalPlayersCount) {
-          console.log('球员返回动画未完成')
-          returnAnimationFrameId = requestAnimationFrame(animate)
-          returnTweenGroup.update()
-        } else {
-          // 只取消返回动画的帧循环，不清理其他资源
-          cancelAnimationFrame(returnAnimationFrameId)
-          returnAnimationFrameId = null
-          if (this.onPlayComplete) {
-            this.onPlayComplete()
-          }
-        }
-      }
-      animate()
-    } else {
-      if (this.onPlayComplete) {
-        this.onPlayComplete()
-      }
+    } else if (this.onPlayComplete) {
+      this.onPlayComplete()
     }
   }
 
@@ -879,4 +868,9 @@ export class TrajectoryManager {
       animate()
     }
   }
+
+
+
+
+
 } 
