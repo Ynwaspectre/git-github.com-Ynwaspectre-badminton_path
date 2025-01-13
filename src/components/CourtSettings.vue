@@ -67,7 +67,7 @@
             </div>
             <n-space align="center" class="mt-4">
                 <n-space align="center">
-                    <span>点位预览</span>
+                    <span>显示点位</span>
                     <n-switch :rail-style="railStyle" v-model:value="isPreviewMode" @update:value="handlePreviewChange"
                         size="small">
                     </n-switch>
@@ -251,7 +251,7 @@
                     <Play />
                 </n-icon>
             </template>
-            预览
+            运行
         </n-button>
         <!-- 球员位置配置 -->
         <n-card class="mb-4" size="small" segmented>
