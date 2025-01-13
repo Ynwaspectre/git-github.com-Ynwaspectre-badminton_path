@@ -78,11 +78,26 @@
                         @update:value="handleTrajectoryVisibilityChange">
                     </n-switch>
                 </n-space>
-                <!-- <n-space align="center">
-                    <span>移动点设置光标辅助</span>
-                    <n-switch :rail-style="railStyle" v-model:value="showMovePoints" size="small"
-                        @update:value="handleMovePointsVisibilityChange" />
-                </n-space> -->
+                <!-- 添加导入导出按钮 -->
+
+            </n-space>
+            <n-space align="center" class="mt-4">
+                <n-button secondary type="info" size="tiny" @click="handleExportData">
+                    <template #icon>
+                        <n-icon>
+                            <CloudDownload />
+                        </n-icon>
+                    </template>
+                    数据导出
+                </n-button>
+                <n-button secondary type="info" size="tiny" @click="handleImportData">
+                    <template #icon>
+                        <n-icon>
+                            <CloudUpload />
+                        </n-icon>
+                    </template>
+                    数据导入
+                </n-button>
             </n-space>
         </n-card>
 
@@ -99,7 +114,21 @@
             <template #header-extra>
                 <div class="flex justify-center items-center space-x-4 mr2">
                     <n-space align="center">
-                        <span>点位采集</span>
+                        <n-tooltip trigger="hover">
+                            <template #trigger>
+                                <span class="flex items-center">
+                                    点位采集
+                                    <n-icon size="16" class="ml-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                                            <path
+                                                d="M256 56C145.72 56 56 145.72 56 256s89.72 200 200 200 200-89.72 200-200S366.28 56 256 56zm0 82a26 26 0 11-26 26 26 26 0 0126-26zm48 226h-88a16 16 0 010-32h28v-88h-16a16 16 0 010-32h32a16 16 0 0116 16v104h28a16 16 0 010 32z"
+                                                fill="currentColor" />
+                                        </svg>
+                                    </n-icon>
+                                </span>
+                            </template>
+                            手动双击球场获取点位数据
+                        </n-tooltip>
                         <n-switch v-model:value="isCollecting" @update:value="handleDesignModeChange" />
                     </n-space>
                     <n-space align="center">
@@ -244,7 +273,7 @@
                 <n-grid :cols="2" :x-gap="12" :y-gap="12" v-else>
                     <!-- 遍历所有球员 -->
                     <n-grid-item v-for="index in playerCount" :key="index">
-                        <div class="flex items-center  mb-2">
+                        <div class="flex items-center mb-2">
                             <div class="text-xs text-highlight font-bold text-black bg-green-500 rounded-lg px2 py0.5">
                                 {{ index }}号球员
                             </div>
@@ -295,19 +324,20 @@
                         <div class="p-4 bg-gray-100 rounded-lg">
                             <div class="flex items-center  mb-2">
                                 <div class="text-xs cursor-pointer text-highlight font-bold text-black bg-yellow rounded-lg px2 py0.5 hover:bg-yellow-200 flex items-center gap-1"
-                                     @click="emit('previewTrajectory', {
+                                    @click="emit('previewTrajectory', {
                                         points: trajectoryPoints.slice(index, index + 2),
                                         config: trajectoryConfigs[`P${index + 1}-P${index + 2}`]
-                                     })">
+                                    })">
                                     <span>P{{ index + 1 }}-P{{ index + 2 }}</span>
                                     <n-icon size="14">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
                                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                             <circle cx="12" cy="12" r="3"></circle>
                                         </svg>
                                     </n-icon>
                                 </div>
-                                
+
 
                                 <div class="flex items-center gap-2 ml-auto">
                                     <div class="flex gap-1">
@@ -445,6 +475,7 @@
         </n-card>
         <!-- 站位 -->
         <div class="h10"></div>
+
     </div>
 </template>
 
@@ -464,6 +495,7 @@ import {
     NTooltip,
     NDivider,
     NEmpty,
+    NInput
 
 } from 'naive-ui'
 import { useDialog, useMessage } from 'naive-ui'
@@ -903,8 +935,9 @@ function handleMatchTypeChange(value) {
 // 更新球员
 function initPlayers(type) {
     console.log(type, '比赛类型')
-    playerPositions.value = PLAYER_CONFIG.initialPositions[type]
-    console.log(playerPositions.value, 'playerPositon.value')
+    // 深拷贝初始位置配置
+    playerPositions.value = JSON.parse(JSON.stringify(PLAYER_CONFIG.initialPositions[type]))
+    console.log(playerPositions.value, 'playerPositions.value')
     updatePlayerMoveConfigs()
     emit('matchTypeChange', {
         type
@@ -1154,6 +1187,91 @@ defineExpose({
     handlePlayComplete,
     handlePointSelected
 })
+
+// 添加数据管理相关函数
+function handleExportData() {
+    try {
+        const exportData = {
+            version: '1.0',
+            matchType: matchStore.selectedType,
+            trajectoryPoints: trajectoryPoints.value,
+            trajectoryConfigs: trajectoryConfigs.value,
+            playerPositions: playerPositions.value,
+            playerMoveConfigs: playerMoveConfigs.value
+        }
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `court-data-${new Date().toISOString().slice(0, 10)}.json`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+
+        message.success('数据导出成功')
+    } catch (error) {
+        message.error('数据导出失败：' + error.message)
+    }
+}
+
+function handleImportData() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = (event) => {
+        const file = event.target.files[0]
+        if (!file) return
+
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            try {
+                importDataFromJson(e.target.result)
+            } catch (error) {
+                message.error('数据导入失败：' + error.message)
+            }
+        }
+        reader.readAsText(file)
+    }
+    input.click()
+}
+
+function importDataFromJson(jsonString) {
+    const data = JSON.parse(jsonString)
+
+    // 验证数据版本和格式
+    if (!data.version || !data.matchType) {
+        throw new Error('无效的数据格式')
+    }
+
+    // 先设置比赛类型并初始化球员
+    matchStore.selectType(data.matchType)
+    initPlayers(data.matchType)
+
+    // 导入数据
+    trajectoryPoints.value = data.trajectoryPoints || []
+    trajectoryConfigs.value = data.trajectoryConfigs || {}
+
+    // 确保在设置球员位置之前已经初始化了默认位置
+    if (data.playerPositions) {
+        // 合并导入的球员位置与默认位置
+        playerPositions.value = {
+            ...PLAYER_CONFIG.initialPositions[data.matchType],
+            ...data.playerPositions
+        }
+    }
+
+    playerMoveConfigs.value = data.playerMoveConfigs || {}
+
+    // 更新预览
+    if (isPreviewMode.value) {
+        emit('previewPoints', trajectoryPoints.value)
+    }
+
+    // 确保更新球员位置
+    emit('updatePlayerPositions', playerPositions.value)
+}
 
 
 
