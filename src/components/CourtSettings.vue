@@ -78,11 +78,11 @@
                         @update:value="handleTrajectoryVisibilityChange">
                     </n-switch>
                 </n-space>
-                <n-space align="center">
+                <!-- <n-space align="center">
                     <span>移动点设置光标辅助</span>
                     <n-switch :rail-style="railStyle" v-model:value="showMovePoints" size="small"
                         @update:value="handleMovePointsVisibilityChange" />
-                </n-space>
+                </n-space> -->
             </n-space>
         </n-card>
 
@@ -215,7 +215,7 @@
 
 
         </n-card>
-        <n-button   size="small" :loading="isPlaying" class="fixed text-black bg-green-400! bottom-4 right-4 z-50"
+        <n-button size="small" :loading="isPlaying" class="fixed text-black bg-green-400! bottom-4 right-4 z-50"
             :disabled="isPlaying || trajectoryPoints.length < 2" @click="playTrajectory">
             <template #icon>
                 <n-icon>
@@ -294,22 +294,33 @@
                     <n-grid-item v-for="(_, index) in trajectoryPoints.slice(0, -1)" :key="index">
                         <div class="p-4 bg-gray-100 rounded-lg">
                             <div class="flex items-center  mb-2">
-                                <div class="text-xs text-highlight font-bold text-black bg-yellow rounded-lg px2 py0.5">
-                                    P{{ index + 1 }}-P{{ index + 2 }}</div>
+                                <div class="text-xs cursor-pointer text-highlight font-bold text-black bg-yellow rounded-lg px2 py0.5 hover:bg-yellow-200 flex items-center gap-1"
+                                     @click="emit('previewTrajectory', {
+                                        points: trajectoryPoints.slice(index, index + 2),
+                                        config: trajectoryConfigs[`P${index + 1}-P${index + 2}`]
+                                     })">
+                                    <span>P{{ index + 1 }}-P{{ index + 2 }}</span>
+                                    <n-icon size="14">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                    </n-icon>
+                                </div>
+                                
 
                                 <div class="flex items-center gap-2 ml-auto">
                                     <div class="flex gap-1">
-                                        <n-tooltip v-for="player in playerMoveConfigs[`P${index + 1}-P${index + 2}`]?.players"
-                                            :key="player"
-                                            trigger="hover"
-                                            placement="top">
+                                        <n-tooltip
+                                            v-for="player in playerMoveConfigs[`P${index + 1}-P${index + 2}`]?.players"
+                                            :key="player" trigger="hover" placement="top">
                                             <template #trigger>
                                                 <div class="cursor-pointer px-2 py-0.5 rounded text-xs" :class="{
                                                     'bg-green-500 text-black font-bold': playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter === player,
                                                     'bg-gray-200 hover:bg-gray-300': playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter !== player
                                                 }"
-                                                @click="playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter = player">
-                                                {{ player }}
+                                                    @click="playerMoveConfigs[`P${index + 1}-P${index + 2}`].hitter = player">
+                                                    {{ player }}
                                                 </div>
                                             </template>
                                             点击选择 {{ player }}号球员 作为击球球员
@@ -374,7 +385,7 @@
                                         <!-- 搭档站位点 -->
                                         <template v-if="matchStore.selectedType === 'doubles'">
                                             <n-grid-item span="2">
-                                                <div class="text-xs">搭档站位点 (搭档在球员击球时的位置)</div>
+                                                <div class="text-xs font-bold mb-1">搭档站位点 (搭档在球员击球时的位置)</div>
                                             </n-grid-item>
                                             <n-grid-item>
                                                 <n-tooltip trigger="hover">
@@ -403,7 +414,7 @@
 
                                             <!-- 搭档回退点 -->
                                             <n-grid-item span="2">
-                                                <div class="text-xs mb-1">搭档回退点 (搭档在球员击球后退到的位置)</div>
+                                                <div class="text-xs mb-1 font-bold">搭档回退点 (搭档在球员击球后退到的位置)</div>
                                             </n-grid-item>
                                             <n-grid-item>
                                                 <n-input-number
@@ -458,7 +469,7 @@ import {
 import { useDialog, useMessage } from 'naive-ui'
 // 图标预览网站: https://www.xicons.org/#/zh-CN/component/ionicons5
 // 从 @vicons/ionicons5 导入需要的图标组件
-import { Settings, ColorPalette, LocationSharp, RocketSharp, GameController, Dice, CloudUpload, CloudDownload, Copy, People, Play, Save } from '@vicons/ionicons5'
+import { ColorPalette, LocationSharp, RocketSharp, GameController, Dice, CloudUpload, CloudDownload, Copy, People, Play, Save } from '@vicons/ionicons5'
 import { PLAYER_CONFIG } from '../settings/player'
 
 const courtStore = useCourtStore()
@@ -474,7 +485,8 @@ const emit = defineEmits([
     'clearPreview',
     'matchTypeChange',
     'updatePlayerPositions',
-    'movePointsUpdate'
+    'movePointsUpdate',
+    'previewTrajectory'
 ])
 
 
@@ -674,12 +686,17 @@ function handleDesignModeChange(value) {
     if (value) {
         dialog.warning({
             title: '点位采集',
-            content: `
-                双打场地添加点位：
-                1. 点位高度默认为1.7米，可后续在点位列表调整
-                2. 相邻点位必须在同半场
-                3. 点击场地处点位，因3D视角问题，点位基本不太准确，可在点位列表优化
-            `,
+            content: () => {
+                return h('div', {}, [
+                    h('p', { style: 'margin-bottom: 8px' }, '场地添加点位：'),
+                    h('ul', { style: 'list-style-type: disc; padding-left: 20px' }, [
+                        h('li', { style: 'margin-bottom: 8px' }, h('strong', {}, '双击采集点位')),
+                        h('li', { style: 'margin-bottom: 8px' }, h('strong', {}, '点位高度默认为1.7米，可后续在点位列表调整')),
+                        h('li', { style: 'margin-bottom: 8px' }, '相邻点位必须在同半场'),
+                        h('li', { style: 'margin-bottom: 8px' }, '点击场地处点位，因3D视角问题，点位基本不太准确，可在点位列表优化')
+                    ])
+                ])
+            },
             positiveText: '确认',
             negativeText: '取消',
             onPositiveClick: () => {
@@ -995,7 +1012,7 @@ watch(
 
 
 // 创建一个计算属性，返回配置的字符串表示
-const playerMoveConfigsString = computed(() => 
+const playerMoveConfigsString = computed(() =>
     JSON.stringify(playerMoveConfigs.value)
 )
 
@@ -1006,7 +1023,7 @@ watch(
         // 将字符串解析回对象
         const newConfigs = JSON.parse(newConfigString);
         const oldConfigs = JSON.parse(oldConfigString);
-        
+
         console.log('New configs:', newConfigs);
         console.log('Old configs:', oldConfigs);
 
@@ -1026,7 +1043,7 @@ function findChangedPoints(newConfigs, oldConfigs) {
         console.log(key, 'key')
         const newConfig = newConfigs[key]
         const oldConfig = oldConfigs[key]
-        
+
         // 检查击球点变化
         if (hasPointChanged(newConfig.hitterStandPoint, oldConfig?.hitterStandPoint)) {
             return {
@@ -1034,7 +1051,7 @@ function findChangedPoints(newConfigs, oldConfigs) {
                 to: newConfig.hitterStandPoint
             }
         }
-        
+
         // 检查回退点变化
         if (hasPointChanged(newConfig.hitterReturnPoint, oldConfig?.hitterReturnPoint)) {
             return {
@@ -1042,7 +1059,7 @@ function findChangedPoints(newConfigs, oldConfigs) {
                 to: newConfig.hitterReturnPoint
             }
         }
-        
+
         // 检查伙伴站位点变化
         if (hasPointChanged(newConfig.partnerStandPoint, oldConfig?.partnerStandPoint)) {
             return {
@@ -1050,7 +1067,7 @@ function findChangedPoints(newConfigs, oldConfigs) {
                 to: newConfig.partnerStandPoint
             }
         }
-        
+
         // 检查伙伴回退点变化
         if (hasPointChanged(newConfig.partnerReturnPoint, oldConfig?.partnerReturnPoint)) {
             return {

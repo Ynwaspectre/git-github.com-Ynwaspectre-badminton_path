@@ -871,6 +871,87 @@ export class TrajectoryManager {
 
 
 
+  previewTrajectory(points, config) {
+    // Clear any existing preview trajectory line
+    if (this.previewTrajectoryLine) {
+      this.scene.remove(this.previewTrajectoryLine)
+      this.previewTrajectoryLine.geometry.dispose()
+      this.previewTrajectoryLine.material.dispose()
+      this.previewTrajectoryLine = null
+    }
+
+    // Calculate duration based on distance and speed
+    const distance = calculateDistance(points[0], points[1])
+    let duration = 1000 * distance / config.speed
+
+    // Create animation
+    new TWEEN.Tween({ progress: 0 }, this.tweenGroup)
+      .to({ progress: 1 }, duration)
+      .easing(TWEEN.Easing.Quadratic.Out)
+      .onUpdate(({ progress }) => {
+        // Create preview trajectory line
+        const linePoints = []
+        const segments = 60
+        const currentSegments = Math.floor(segments * progress)
+
+        for (let i = 0; i <= currentSegments; i++) {
+          const t = i / segments
+          linePoints.push(calculateParabolicPoint(
+            points[0],
+            points[1],
+            t,
+            config?.arcHeight || 0.15
+          ))
+        }
+
+        // Remove existing preview line
+        if (this.previewTrajectoryLine) {
+          this.scene.remove(this.previewTrajectoryLine)
+          this.previewTrajectoryLine.geometry.dispose()
+          this.previewTrajectoryLine.material.dispose()
+        }
+
+        // Create new preview line
+        const geometry = new THREE.BufferGeometry()
+        const vertices = []
+        linePoints.forEach(point => {
+          vertices.push(point.x, point.y, point.z)
+        })
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+
+        const material = new THREE.LineDashedMaterial({
+          color: 0xffffff,
+          linewidth: 2,
+          scale: 1,
+          dashSize: 0.3,
+          gapSize: 0.2,
+          transparent: true,
+          opacity: 1
+        })
+
+        this.previewTrajectoryLine = new THREE.Line(geometry, material)
+        this.previewTrajectoryLine.computeLineDistances()
+        this.scene.add(this.previewTrajectoryLine)
+      })
+      .onComplete(() => {
+        if (this.previewTrajectoryLine) {
+          this.scene.remove(this.previewTrajectoryLine)
+          this.previewTrajectoryLine.geometry.dispose()
+          this.previewTrajectoryLine.material.dispose()
+          this.previewTrajectoryLine = null
+        }
+      })
+      .start()
+
+    // Ensure animation loop is running
+    if (!this.animationFrameId) {
+      const animate = () => {
+        this.animationFrameId = requestAnimationFrame(animate)
+        this.tweenGroup.update()
+      }
+      animate()
+    }
+  }
 
 
 } 

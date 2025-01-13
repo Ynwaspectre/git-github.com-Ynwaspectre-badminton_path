@@ -11,7 +11,7 @@
               @clearPoints="handleClearPoints" @clearPreview="handleClearPreview"
               @startCollectingPoints="handleStartCollectingPoints" @stopCollectingPoints="handleStopCollectingPoints"
               @matchTypeChange="handleMatchTypeChange" @updatePlayerPositions="handleUpdatePlayerPositions"
-              @movePointsUpdate="handleMovePointsUpdate" />
+              @movePointsUpdate="handleMovePointsUpdate" @previewTrajectory="handlePreviewTrajectory" />
           </div>
         </div>
       </n-message-provider>
@@ -74,5 +74,9 @@ function handleUpdatePlayerPositions(positions) {
 
 function handleMovePointsUpdate(moveConfigs) {
   courtRef.value?.updateMovePointsLightCircle(moveConfigs)
+}
+
+const handlePreviewTrajectory = (previewData) => {
+  courtRef.value?.previewTrajectory(previewData)
 }
 </script>

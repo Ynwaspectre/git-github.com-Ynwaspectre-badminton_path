@@ -12,8 +12,8 @@ import { useCourtStore } from '../stores/court'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry'
 
-import { 
-  COURT_CONFIG, 
+import {
+  COURT_CONFIG,
   LIGHT_CONFIG,
 } from '../settings/scene'
 
@@ -127,7 +127,7 @@ function initThreeJS() {
 
   createCourt()
   createLighting()
-  
+
 
   window.addEventListener('resize', onWindowResize)
 }
@@ -140,8 +140,8 @@ function createCourt() {
   const courtMaterial = new THREE.MeshStandardMaterial({
     color: courtConfig.colors.court,
     side: THREE.DoubleSide,
-    roughness: courtConfig.materials.courtRoughness,
-    metalness: courtConfig.materials.metalness,
+    roughness: 0.8,
+    metalness: 0.1,
     flatShading: false
   })
   courtPlane = new THREE.Mesh(courtGeometry, courtMaterial)
@@ -157,10 +157,10 @@ function createCourt() {
     courtConfig.dimensions.length + paddingZ * 2
   )
   const borderMaterial = new THREE.MeshStandardMaterial({
-    color: courtConfig.colors.court, // 使用与球场相同的颜色
+    color: courtConfig.colors.court,
     side: THREE.DoubleSide,
-    roughness: courtConfig.materials.courtRoughness,
-    metalness: courtConfig.materials.metalness,
+    roughness: 0.8,
+    metalness: 0.1,
     flatShading: false
   })
   const borderPlane = new THREE.Mesh(borderGeometry, borderMaterial)
@@ -326,11 +326,17 @@ function createNet() {
 // 创建灯光
 function createLighting() {
   // 环境光
-  const ambientLight = new THREE.AmbientLight(LIGHT_CONFIG.ambient.color, LIGHT_CONFIG.ambient.intensity)
+  const ambientLight = new THREE.AmbientLight(
+    LIGHT_CONFIG.ambient.color, 
+    LIGHT_CONFIG.ambient.intensity * 0.7
+  )
   scene.add(ambientLight)
 
   // 主光源
-  const mainLight = new THREE.DirectionalLight(LIGHT_CONFIG.main.color, LIGHT_CONFIG.main.intensity)
+  const mainLight = new THREE.DirectionalLight(
+    LIGHT_CONFIG.main.color, 
+    LIGHT_CONFIG.main.intensity * 0.8
+  )
   mainLight.position.set(LIGHT_CONFIG.main.position.x, LIGHT_CONFIG.main.position.y, LIGHT_CONFIG.main.position.z)
   mainLight.castShadow = true
 
@@ -374,7 +380,7 @@ function createLogo() {
       opacity: 1
     });
 
-    
+
     const nearTextMesh = new THREE.Mesh(textGeometry.clone(), textMaterial.clone());
     nearTextMesh.position.set(
       -1.5,  // 与场地边线对齐
@@ -382,11 +388,11 @@ function createLogo() {
       -7.4    // 在外边框和场地线之间的中间
     );
     nearTextMesh.rotation.x = -Math.PI / 2;
-    nearTextMesh.rotation.z = Math.PI ;
+    nearTextMesh.rotation.z = Math.PI;
     nearTextMesh.isLogo = true;
     scene.add(nearTextMesh);
 
-  
+
     const farTextMesh = new THREE.Mesh(textGeometry.clone(), textMaterial.clone());
     farTextMesh.position.set(
       1.5,   // 与场地边线对齐
@@ -444,8 +450,8 @@ function clearPreview() {
 }
 
 // 添加播放轨迹方法
-function playTrajectory(points, trajectoryConfigs,playerMoveConfigs,showTrajectory) {
-  trajectoryManager.playTrajectory(points, trajectoryConfigs,playerMoveConfigs,showTrajectory)
+function playTrajectory(points, trajectoryConfigs, playerMoveConfigs, showTrajectory) {
+  trajectoryManager.playTrajectory(points, trajectoryConfigs, playerMoveConfigs, showTrajectory)
 }
 
 // 添加清除方法
@@ -463,10 +469,10 @@ function onMouseClick(event) {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
 
   raycaster.setFromCamera(mouse, camera)
-  
+
   // 与场地平面相交
   const intersects = raycaster.intersectObject(courtPlane)
-  
+
   if (intersects.length > 0) {
     const point = intersects[0].point
     // 发送选中的点位数据到父组件
@@ -489,19 +495,7 @@ function stopCollectingPoints() {
   courtContainer.value.removeEventListener('dblclick', onMouseClick)
 }
 
-// 暴露方法供父组件使用
-defineExpose({
-  previewPoints,
-  clearPreview,
-  playTrajectory,
-  clearMarkers,
-  startCollectingPoints,
-  stopCollectingPoints,
-  updateMatchType,
-  movePlayerToPoint,
-  updatePlayerPositions,
-  updateMovePointsLightCircle
-})
+
 
 // 添加 updateMatchType 方法
 function updateMatchType(config) {
@@ -526,8 +520,33 @@ function updatePlayerPositions(positions) {
 
 // 添加更新移动点光圈的方法
 function updateMovePointsLightCircle(moveConfigs) {
-    if (trajectoryManager) {
-        trajectoryManager.updateMovePointsLightCircle(moveConfigs)
-    }
+  if (trajectoryManager) {
+    trajectoryManager.updateMovePointsLightCircle(moveConfigs)
+  }
 }
+
+const previewTrajectory = ({ points, config }) => {
+  // 清除现有的预览
+  if (trajectoryManager) {
+    trajectoryManager.previewTrajectory(points,config)
+  }
+}
+
+
+
+// 暴露方法供父组件使用
+defineExpose({
+  previewPoints,
+  clearPreview,
+  playTrajectory,
+  clearMarkers,
+  startCollectingPoints,
+  stopCollectingPoints,
+  updateMatchType,
+  movePlayerToPoint,
+  updatePlayerPositions,
+  updateMovePointsLightCircle,
+  previewTrajectory
+})
+
 </script>
