@@ -724,7 +724,7 @@ function handleDesignModeChange(value) {
                     h('ul', { style: 'list-style-type: disc; padding-left: 20px' }, [
                         h('li', { style: 'margin-bottom: 8px' }, h('strong', {}, '双击采集点位')),
                         h('li', { style: 'margin-bottom: 8px' }, h('strong', {}, '点位高度默认为1.7米，可后续在点位列表调整')),
-                        h('li', { style: 'margin-bottom: 8px' }, '相邻点位必须在同半场'),
+                        h('li', { style: 'margin-bottom: 8px' }, '相邻点位必须在不同半场'),
                         h('li', { style: 'margin-bottom: 8px' }, '点击场地处点位，因3D视角问题，点位基本不太准确，可在点位列表优化')
                     ])
                 ])
