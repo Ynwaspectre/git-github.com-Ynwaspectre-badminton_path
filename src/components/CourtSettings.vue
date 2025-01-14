@@ -82,6 +82,14 @@
 
             </n-space>
             <n-space align="center" class="mt-4">
+                <n-button secondary type="warning" size="tiny" @click="handleImportData">
+                    <template #icon>
+                        <n-icon>
+                            <CloudUpload />
+                        </n-icon>
+                    </template>
+                    数据导入
+                </n-button>
                 <n-button secondary type="info" size="tiny" @click="handleExportData">
                     <template #icon>
                         <n-icon>
@@ -89,14 +97,6 @@
                         </n-icon>
                     </template>
                     数据导出
-                </n-button>
-                <n-button secondary type="info" size="tiny" @click="handleImportData">
-                    <template #icon>
-                        <n-icon>
-                            <CloudUpload />
-                        </n-icon>
-                    </template>
-                    数据导入
                 </n-button>
             </n-space>
         </n-card>
